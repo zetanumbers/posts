@@ -7,21 +7,52 @@
 
 Currently there is a consensus about abscence of the drop guarantee. To be precise, in today's Rust you can forget some value via [`core::mem::forget`](https://doc.rust-lang.org/1.75.0/core/mem/fn.forget.html) or via some other safe contraption like cyclic shared references `Rc/Arc`.
 
-As you may know in the early days of Rust the drop guarantee was intended to exist. Instead of today's [`std::thread::scope`](https://doc.rust-lang.org/1.75.0/std/thread/fn.scope.html) there was [`std::thread::scoped`](https://doc.rust-lang.org/1.0.0/std/thread/fn.scoped.html) which worked in a similar manner, except it used a guard value with a drop implementation to join the spawned thread so that it wouldn't refer to any local stack variable after the parent thread exited the scope and destroyed them, but due to abscense of the drop guarantee it was found to be unsound and was removed from standard library.<sup id="cite_ref-1">[\[1\]](#cite_note-1)</sup> Let's name these two approaches as <dfn id="intro-guarded_closure"> [guarded closure](#term-guarded_closure) </dfn> and <dfn> [guard object](#term-guard_object) </dfn>. C++ has no problem with analogous [`std::jthread`](https://en.cppreference.com/w/cpp/thread/jthread) since C++ .
+As you may know in the early days of Rust the drop guarantee was intended to exist. Instead of today's [`std::thread::scope`](https://doc.rust-lang.org/1.75.0/std/thread/fn.scope.html) there was [`std::thread::scoped`](https://doc.rust-lang.org/1.0.0/std/thread/fn.scoped.html) which worked in a similar manner, except it used a guard value with a drop implementation to join the spawned thread so that it wouldn't refer to any local stack variable after the parent thread exited the scope and destroyed them, but due to abscense of the drop guarantee it was found to be unsound and was removed from standard library.<sup id="cite_ref-1">[\[1\]](#cite_note-1)</sup> Let's name these two approaches as <dfn id="intro-guarded_closure"> [guarded closure](#term-guarded_closure) </dfn> and <dfn id="intro-guarde_object"> [guard object](#term-guard_object) </dfn>. Also to note C++20 has analogous [`std::jthread`](https://en.cppreference.com/w/cpp/thread/jthread) guard object.
 
-There is also a discussion among Rust theorists about <dfn title="value of which should be used at least once, generally speaking"> linear types </dfn> which leads them researching (or maybe revisiting) the possible `Leak` trait. I've noticed some confusion and thus hesitation when people are trying to define what does leaking a value mean. I will try to clarify and define what does leak actually mean.
+There is also a discussion among Rust theorists about <dfn id="intro-linear_type"> [linear types](#term-linear_type) </dfn> which leads them researching (or maybe revisiting) the possible `Leak` trait. I've noticed some confusion and thus hesitation when people are trying to define what does leaking a value mean. I will try to clarify and define what does leak actually mean.
 
-## The problem
+## Problem
 
+```rust
+use std::marker::PhantomData;
+use std::thread;
+
+struct JoinGuard<'a> {
+    // using unit as a return value for simplicity
+    thread: thread::JoinHandle<()>,
+    _marker: PhantomData<&'a ()>,
+}
+
+impl<'a> JoinGuard<'a> {
+    fn spawn<F>(f: F) -> Self
+    where
+        F: FnOnce() + Send + 'a,
+    {
+        JoinGuard {
+            thread: thread::spawn(f),
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl Drop for JoinGuard<'_> {
+    fn drop(&mut self) {
+        // Ignoring error, not propating, fine in this situation
+        let _ = self.thread.join();
+    }
+}
+```
+
+For the guard object mechanism to work TODO
 <!-- TODO: thread/jthread, tigerbeetle::Client callback: 'static -->
 
 ## Solution
 
-<!-- TODO: Definition -->
+<!-- TODO: Definition, the other way around -->
 
 <!-- TODO: Theorem and it's assumptions, GC analogy -->
 
-## Impl
+## Implementation
 
 <!-- TODO: `unsafe auto trait Leak {}` and it being a default type bound -->
 <!-- TODO: `struct PhantomUnleak` -->
@@ -33,6 +64,7 @@ There is also a discussion among Rust theorists about <dfn title="value of which
 <!-- no backwards compatible fix for thread::spawn, but it is already not possible because of return type -->
 <!-- TODO: std::mem::forget_unchecked -->
 <!-- TODO: `MutexGuard<'a, T>: !Leak` bound is not required but can exist. However with `MutexGuard` current API this bound could safely be broken in any scenario i can think of -->
+<!-- TODO: the wast majority of types are Leak -->
 <!-- TODO: `mpsc::channel<T>() where T: Leak` -->
 <!-- TODO: if Vec element panics during drop currently it then forgets this value and moves forward, which should be modified to accomodate `!Leak` types -->
 
@@ -42,9 +74,25 @@ There is also a discussion among Rust theorists about <dfn title="value of which
 
 <!-- TODO: Drop but not AsyncDrop, possible generalization as a cleanup code -->
 
+## Possible problems
+
+<!-- TODO: compiler introducing leaks somewhere unknown place because of leak assumption -->
+
+## Conclusion
+
+<!-- TODO: this is very promising -->
+
 ## Terminology
 
 <dl>
+
+<dt id="term-linear_type"> <a href="#intro-linear_type" title="Jump up">^</a> Linear type </dt>
+
+<dd>
+
+value of which should be used at least once, generally speaking.
+
+</dd>
 
 <dt id="term-guarded_closure"> <a href="#intro-guarded_closure" title="Jump up">^</a> Guarded closure </dt>
 
@@ -126,7 +174,7 @@ a = 420
 </dl>
 <dl>
 
-<dt id="term-guard_object"> Guard object </dt>
+<dt id="term-guard_object"> <a href="#intro-guarde_object" title="Jump up">^</a> Guard object </dt>
 
 <dd>
 

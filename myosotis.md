@@ -1,5 +1,4 @@
 # The drop guarantee
-<!-- TODO: rename into Forget/Lose/Trace/Reach or and maybe use -able suffix -->
 
 <a title="Forget-me-nots - Sedum Tauno Erik, CC BY-SA 2.5 &lt;https://creativecommons.org/licenses/by-sa/2.5&gt;, via Wikimedia Commons" href="https://commons.wikimedia.org/wiki/File:Myosotis_arvensis_ois.JPG"><img width="512" alt="Myosotis arvensis ois" src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Myosotis_arvensis_ois.JPG/512px-Myosotis_arvensis_ois.JPG"></a>
 
@@ -39,18 +38,30 @@ One trivial implementation might have already creeped into your mind.
 unsafe auto trait Leak {}
 ```
 
+This is an automatic trait, which would mean that it is implemented for types in a similair manner to `Send`.<sup id="cite_ref-4">[\[4\]](#cite_note-4)</sup> Name `Leak` is a subject for a possible future change. I used it as it came up in many people's thoughts as `Leak`. Since `T: !Leak` types possibly could leak in a practical meaning, it can be renamed into `Forget`. Other variants could be `Lose`, `!Trace` or `!Reach` (last two as in tracing GC), maybe add `-able` suffix?
+
 This trait would help to forbid `!Leak` values use problematic functionality. First, the `core::mem::forget` will have this bound over its generic type argument. Second, most data structures introducing shared ownership will be limited or disabled for `!Leak` types, things like `Rc`, `Arc`, various channel types having some shared buffer like inside of `std::sync::mpsc` module. That is because reference counted types can be moved into themselves or send your receiver into shared buffer with some value to be leaked (synchronous(?) rendezvous channels seem to not have this issue). However, there is a decision to be made about what parts of API should be restricted and which should not: type contructors, `Rc::clone` or type itself?
 
-Given that `!Leak` implies new restrictions compared to current rust value semantics, by default every type is assumed to be `T: Leak`, kinda like with `Sized`, e.g. implicit `Leak` trait bound on every type and type argument unless specified otherwise (`T: ?Leak`). I pretty sure this feature should not introduce any breaking changes. There could be a way to disable implicit `T: Leak` bounds between editions, although I do not see it as a desirable change, since `!Leak` types would be a small minority.
+Given that `!Leak` implies new restrictions compared to current rust value semantics, by default every type is assumed to be `T: Leak`, kinda like with `Sized`, e.g. implicit `Leak` trait bound on every type and type argument unless specified otherwise (`T: ?Leak`). I pretty sure this feature should not introduce any breaking changes. There could be a way to disable implicit `T: Leak` bounds between editions, although I do not see it as a desirable change, since `!Leak` types would be a small minority in my vision.
 
-<!-- TODO: Interation with subtyping and variance -->
-<!-- TODO: std::mem::forget_static, and reasons to avoid it (types should implement Leak if they have 'static) -->
-<!-- no backwards compatible fix for thread::spawn, but it is already not possible because of return type -->
-<!-- TODO: std::mem::forget_unchecked -->
-<!-- TODO: `MutexGuard<'a, T>: !Leak` bound is not required but can exist. However with `MutexGuard` current API this bound could safely be broken in any scenario i can think of -->
-<!-- TODO: the wast majority of types are Leak -->
-<!-- TODO: `mpsc::channel<T>() where T: Leak` -->
-<!-- TODO: if Vec element panics during drop currently it then forgets this value and moves forward, which should be modified to accomodate `!Leak` types -->
+One thing that we should be aware of in the future would be users' desire of making their types `!Leak` while not actually needing. The appropriate example would be `MutexGuard<'a, T>` being `!Leak`. It is not required, since it is actually safe to forget a value of this type or to never unlock a mutex, but it can exist. In this case, you can safely violate `!Leak` bound, making it useless in practice. Thus unnecessary `!Leak` impls should be avoided. To address users' underlying itch to do this, they should be informed that forgetting or leaking a value is already undesirable and may be considered a logic bug.
+
+Of course there should be an unsafe `core::mem::forget_unchecked` for any value if you really know what you're doing, there are some ways to implement `core::mem::forget` for any type with unsafe code still, for example with `core::ptr::write`. There should also probably be safe `core::mem::forget_static` since you can basically do that using thread with an endless loop. However `!Leak` types should implement `Leak` for static lifetimes themselves to satisfy any function's bounds over types.
+
+```rust
+struct JoinGuard<'a, T: 'a> { /* ... */ }
+unsafe impl<T: 'static> Leak for JoinGuard<'static, T> {}
+```
+
+One interesting case comes up when thinking about types [contravariant](https://doc.rust-lang.org/reference/subtyping.html) by their generic argument lifetime. Since this lifetime can be extended into `'static` you should implement `Leak` then for any possible lifetime in this position.
+
+```rust
+struct ContravariantLifetime<'contravariant, 'covariant> {
+    // some fields
+    _marker: PhantomData<fn(&'contravariant ()) -> &'covariant ()>
+}
+unsafe impl<'contravariant> Leak for ContravariantLifetime<'contravariant, 'static> {}
+```
 
 By analogy with `trait Unpin` and `struct PhantomPinned`, there should probably be `struct PhantomUnleak`.
 
@@ -72,9 +83,9 @@ By analogy with `trait Unpin` and `struct PhantomPinned`, there should probably 
 
 ## Possible problems
 
-<!-- TODO: compiler introducing leaks somewhere unknown place because of leak assumption -->
+Some current std library functionality relies upon forgetting values, like `Vec` does it in some cases like panic during element's drop. I'm not sure if anyone relies upon this, so we could use abort instead. Or instead we can add `std::mem::is_leak::<T>() -> bool` to determine if we can forget values or not and then act accordingly.
 
-<!-- TODO: -->
+There could also be some niche compilation case, where compiler assumes every type is `Leak` and purposefully forgets a value.
 
 ## Conclusion
 
@@ -202,3 +213,5 @@ TODO
 2. <a href="#cite_ref-2" id="cite_note-2" title="Jump up">^</a> [Yoshua Wuyts - Linear Types One-Pager # Updates](https://blog.yoshuawuyts.com/linear-types-one-pager/#updates)
 
 3. <a href="#cite_ref-3" id="cite_note-3" title="Jump up">^</a> [wikipedia.org - Halting_problem](https://en.wikipedia.org/wiki/Halting_problem)
+
+4. <a href="#cite_ref-4" id="cite_note-4" title="Jump up">^</a> [unstable book - auto-traits](https://doc.rust-lang.org/beta/unstable-book/language-features/auto-traits.html)

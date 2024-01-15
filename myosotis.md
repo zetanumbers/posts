@@ -46,7 +46,7 @@ This trait would help to forbid `!Leak` values use problematic functionality. Fi
 
 Given that `!Leak` implies new restrictions compared to current rust value semantics, by default every type is assumed to be `T: Leak`, kinda like with `Sized`, e.g. implicit `Leak` trait bound on every type and type argument unless specified otherwise (`T: ?Leak`). I pretty sure this feature should not introduce any breaking changes. There could be a way to disable implicit `T: Leak` bounds between editions, although I do not see it as a desirable change, since `!Leak` types would be a small minority in my vision.
 
-One thing that we should be aware of in the future would be users' desire of making their types `!Leak` while not actually needing. The appropriate example would be `MutexGuard<'a, T>` being `!Leak`. It is not required, since it is actually safe to forget a value of this type or to never unlock a mutex, but it can exist. In this case, you can safely violate `!Leak` bound, making it useless in practice. Thus unnecessary `!Leak` impls should be avoided. To address users' underlying itch to do this, they should be informed that forgetting or leaking a value is already undesirable and may be considered a logic bug.
+One thing that we should be aware of in the future would be users' desire of making their types `!Leak` while not actually needing. The appropriate example would be `MutexGuard<'a, T>` being `!Leak`. It is not required, since it is actually safe to forget a value of this type or to never unlock a mutex, but it can exist. In this case, you can safely violate `!Leak` bound, making it useless in practice. Thus unnecessary `!Leak` impls should be avoided. To address users' underlying itch to do this, they should be informed that **forgetting or leaking a value is already undesirable and can be considered a logic bug**.
 
 Of course there should be an unsafe `core::mem::forget_unchecked` for any value if you really know what you're doing, there are some ways to implement `core::mem::forget` for any type with unsafe code still, for example with `core::ptr::write`. There should also probably be safe `core::mem::forget_static` since you can basically do that using thread with an endless loop. However `!Leak` types should implement `Leak` for static lifetimes themselves to satisfy any function's bounds over types.
 
@@ -74,7 +74,7 @@ While implementing `!Leak` types you should also make sure you cannot move a val
 unsafe impl<T: 'static> Send for JoinGuard<'static, T> {}
 ```
 
-There is also a way to forbid `JoinGuard` from moving into its thread if we bound it by a different lifetime which is shorter than input closure's lifetime (see `JoinGuardScoped` in leak-playground [docs](https://zetanumbers.github.io/leak-playground/leak_playground/) and [repo](https://github.com/zetanumbers/leak-playground)).
+There is also a way to forbid `JoinGuard` from moving into its thread if we bound it by a different lifetime which is shorter than input closure's lifetime (see `JoinGuardScoped` in leak-playground [docs](https://zetanumbers.github.io/leak-playground/leak_playground/) and [repo](https://github.com/zetanumbers/leak-playground), it works and does not when needed, but I'm not sure without an actual proof).
 
 ## Extensions and alternatives
 
@@ -88,8 +88,6 @@ There is also a way to forbid `JoinGuard` from moving into its thread if we boun
 
 ## Forward compatibility
 
-<!-- TODO: Possible switch to the default `!Leak` bound on types for some future edition could not be painful at all? -->
-
 <!-- TODO: Drop but not AsyncDrop, possible generalization as a cleanup code -->
 
 ## Possible problems
@@ -101,6 +99,7 @@ There could also be some niche compilation case, where compiler assumes every ty
 ## Conclusion
 
 <!-- TODO: this is very promising -->
+<!-- TODO: one step towards linear types -->
 
 ## Terminology
 

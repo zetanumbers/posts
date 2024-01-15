@@ -40,6 +40,8 @@ unsafe auto trait Leak {}
 
 This is an automatic trait, which would mean that it is implemented for types in a similair manner to `Send`.<sup id="cite_ref-4">[\[4\]](#cite_note-4)</sup> Name `Leak` is a subject for a possible future change. I used it as it came up in many people's thoughts as `Leak`. Since `T: !Leak` types possibly could leak in a practical meaning, it can be renamed into `Forget`. Other variants could be `Lose`, `!Trace` or `!Reach` (last two as in tracing GC), maybe add `-able` suffix?
 
+By analogy with `trait Unpin` and `struct PhantomPinned`, there should probably be `struct PhantomUnleak`.
+
 This trait would help to forbid `!Leak` values use problematic functionality. First, the `core::mem::forget` will have this bound over its generic type argument. Second, most data structures introducing shared ownership will be limited or disabled for `!Leak` types, things like `Rc`, `Arc`, various channel types having some shared buffer like inside of `std::sync::mpsc` module. That is because reference counted types can be moved into themselves or send your receiver into shared buffer with some value to be leaked (synchronous(?) rendezvous channels seem to not have this issue). However, there is a decision to be made about what parts of API should be restricted and which should not: type contructors, `Rc::clone` or type itself?
 
 Given that `!Leak` implies new restrictions compared to current rust value semantics, by default every type is assumed to be `T: Leak`, kinda like with `Sized`, e.g. implicit `Leak` trait bound on every type and type argument unless specified otherwise (`T: ?Leak`). I pretty sure this feature should not introduce any breaking changes. There could be a way to disable implicit `T: Leak` bounds between editions, although I do not see it as a desirable change, since `!Leak` types would be a small minority in my vision.
@@ -49,7 +51,10 @@ One thing that we should be aware of in the future would be users' desire of mak
 Of course there should be an unsafe `core::mem::forget_unchecked` for any value if you really know what you're doing, there are some ways to implement `core::mem::forget` for any type with unsafe code still, for example with `core::ptr::write`. There should also probably be safe `core::mem::forget_static` since you can basically do that using thread with an endless loop. However `!Leak` types should implement `Leak` for static lifetimes themselves to satisfy any function's bounds over types.
 
 ```rust
-struct JoinGuard<'a, T: 'a> { /* ... */ }
+struct JoinGuard<'a, T: 'a> {
+    // ...
+    _unleak: PhantomUnleak,
+}
 unsafe impl<T: 'static> Leak for JoinGuard<'static, T> {}
 ```
 
@@ -57,13 +62,19 @@ One interesting case comes up when thinking about types [contravariant](https://
 
 ```rust
 struct ContravariantLifetime<'contravariant, 'covariant> {
-    // some fields
-    _marker: PhantomData<fn(&'contravariant ()) -> &'covariant ()>
+    // ...
+    _variance: PhantomData<fn(&'contravariant ()) -> &'covariant ()>
 }
 unsafe impl<'contravariant> Leak for ContravariantLifetime<'contravariant, 'static> {}
 ```
 
-By analogy with `trait Unpin` and `struct PhantomPinned`, there should probably be `struct PhantomUnleak`.
+While implementing `!Leak` types you should also make sure you cannot move a value of this type into itself. In particular `JoinGuard` may be made `!Send` to ensure that user won't send `JoinGuard` into its inner thread, creating a reference to itself, thus escaping from a parent thread while having live references to parent thread local variables.
+
+```rust
+unsafe impl<T: 'static> Send for JoinGuard<'static, T> {}
+```
+
+There is also a way to forbid `JoinGuard` from moving into its thread if we bound it by a different lifetime which is shorter than input closure's lifetime (see `JoinGuardScoped` in leak-playground [docs](https://zetanumbers.github.io/leak-playground/leak_playground/) and [repo](https://github.com/zetanumbers/leak-playground)).
 
 ## Extensions and alternatives
 

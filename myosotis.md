@@ -4,17 +4,19 @@
 
 ## Background
 
-Currently there is a consensus about abscence of the drop guarantee. To be precise, in today's Rust you can forget some value via [`core::mem::forget`](https://doc.rust-lang.org/1.75.0/core/mem/fn.forget.html) or via some other safe contraption like cyclic shared references `Rc/Arc`.
+Currently there is a consensus about absence of the drop guarantee. To be precise, in today's Rust you can forget some value via [`core::mem::forget`](https://doc.rust-lang.org/1.75.0/core/mem/fn.forget.html) or via some other safe contraption like cyclic shared references `Rc/Arc`.
 
-As you may know in the early days of Rust the drop guarantee was intended to exist. Instead of today's [`std::thread::scope`](https://doc.rust-lang.org/1.75.0/std/thread/fn.scope.html) there was [`std::thread::scoped`](https://doc.rust-lang.org/1.0.0/std/thread/fn.scoped.html) which worked in a similar manner, except it used a guard value with a drop implementation to join the spawned thread so that it wouldn't refer to any local stack variable after the parent thread exited the scope and destroyed them, but due to abscense of the drop guarantee it was found to be unsound and was removed from standard library.<sup id="cite_ref-1">[\[1\]](#cite_note-1)</sup> Let's name these two approaches as <dfn id="intro-guarded_closure"> [guarded closure](#term-guarded_closure) </dfn> and <dfn id="intro-guard_object"> [guard object](#term-guard_object) </dfn>. Also to note C++20 has analogous [`std::jthread`](https://en.cppreference.com/w/cpp/thread/jthread) guard object.
+As you may know in the early days of Rust the drop guarantee was intended to exist. Instead of today's [`std::thread::scope`](https://doc.rust-lang.org/1.75.0/std/thread/fn.scope.html) there was [`std::thread::scoped`](https://doc.rust-lang.org/1.0.0/std/thread/fn.scoped.html) which worked in a similar manner, except it used a guard value with a drop implementation to join the spawned thread so that it wouldn't refer to any local stack variable after the parent thread exited the scope and destroyed them, but due to absence of the drop guarantee it was found to be unsound and was removed from standard library.<sup id="cite_ref-1">[\[1\]](#cite_note-1)</sup> Let's name these two approaches as <dfn id="intro-guarded_closure"> [guarded closure](#term-guarded_closure) </dfn> and <dfn id="intro-guard_object"> [guard object](#term-guard_object) </dfn>. Also to note C++20 has analogous [`std::jthread`](https://en.cppreference.com/w/cpp/thread/jthread) guard object.
 
 There is also a discussion among Rust theorists about <dfn id="intro-linear_type"> [linear types](#term-linear_type) </dfn> which leads them researching (or maybe revisiting) the possible `Leak` trait. I've noticed some confusion and thus hesitation when people are trying to define what does leaking a value mean. I will try to clarify and define what does leak actually mean.
 
 ## Problem
 
-There is a class of problems that we will try to solve. In particular, we return some object from a function or a method that mutably (exclusivelly) borrows one of function arguments. While returned object is alive we could not refer to borrowed value, which can be a useful property to exploit. You can invalidate some invariant of a borrowed type but then you restore it inside of returned object's drop. This is a fine concept until you realize in some circumstances drop is not called, which would in turn mean that the borrowed type invariant invalidation may never cause <dfn id="intro-undefined_behavior"> [undefined behavior](#term-undefined_behavior) </dfn> (UB in short) if left untreated. However, if drop is guaranteed, we could mess with borrowed type invariant, knowing that the cleanup will restore the invariant and make impossible to cause UB after. I found one example of this as once mentioned planned feature [`Vec::drain_range`](https://github.com/rust-lang/rust/issues/24292#issuecomment-93513451).
+There is a class of problems that we will try to solve. In particular, we return some object from a function or a method that mutably (exclusively) borrows one of function arguments. While returned object is alive we could not refer to borrowed value, which can be a useful property to exploit. You can invalidate some invariant of a borrowed type but then you restore it inside of returned object's drop. This is a fine concept until you realize in some circumstances drop is not called, which would in turn mean that the borrowed type invariant invalidation may never cause <dfn id="intro-undefined_behavior"> [undefined behavior](#term-undefined_behavior) </dfn> (UB in short) if left untreated. However, if drop is guaranteed, we could mess with borrowed type invariant, knowing that the cleanup will restore the invariant and make impossible to cause UB after. I found one example of this as once mentioned planned feature [`Vec::drain_range`](https://github.com/rust-lang/rust/issues/24292#issuecomment-93513451).
 
-One other special case would be owned scoped thread. It may be included within class of problems mentioned, but I am not sure. Anyway, in the most trivial case this is the same as once deleted `std::thread::{scoped, JoinGuard}` described above. However, many C APIs may in some sense use this via the <dfn id="intro-callback_registration"> [callback registration](#term-callback_registration) </dfn> pattern, most common for multithreaded client handles. Abscense of a drop guarantee thus implies `'static` lifetime for a callback so that the user wouldn't use invalidated references inside of the callback, if client uses guard object API pattern ([see example](https://docs.rs/tigerbeetle-unofficial-core/latest/tigerbeetle_unofficial_core/struct.Client.html#method.with_callback)).
+One other special case would be owned scoped thread. It may be included within class of problems mentioned, but I am not sure. Anyway, in the most trivial case this is the same as once deleted `std::thread::{scoped, JoinGuard}` described above. However, many C APIs may in some sense use this via the <dfn id="intro-callback_registration"> [callback registration](#term-callback_registration) </dfn> pattern, most common for multithreaded client handles. Absence of a drop guarantee thus implies `'static` lifetime for a callback so that the user wouldn't use invalidated references inside of the callback, if client uses guard object API pattern ([see example](https://docs.rs/tigerbeetle-unofficial-core/latest/tigerbeetle_unofficial_core/struct.Client.html#method.with_callback)).
+
+<!-- Need to also mention scoped tasks for async as motivation -->
 
 ## Solution
 
@@ -24,27 +26,53 @@ Most importantly in these two cases objects with the drop guarantee would be bou
 Drop guarantee asserts that bounding lifetime of an object must end only after its drop. Somehow breaking this guarantee can lead to UB.
 ```
 
-Notice what this implies for `T: 'static` types. Since static lifetime never ends, the drop may never be called. This property does not conflict with described usecases. `JoinGuard<'static, T>` indeed doesn't requre a drop guarantee, since there would be no references what would ever invalidate.
+Notice what this implies for `T: 'static` types. Since static lifetime never ends, the drop may never be called. This property does not conflict with described use cases. `JoinGuard<'static, T>` indeed doesn't require a drop guarantee, since there would be no references that would ever be invalidated.
 
-In context of discussion some argue it is possible to implement `core::mem::forget` via threads and an infinite loop.<sup id="cite_ref-2">[\[2\]](#cite_note-2)</sup> That forget implementation won't violate a drop guarantee as defined above, since either you use regular threads which requre `F: 'static` or use scoped threads which would join this never completing thread thus no drop and no lifetime end. My further advice would be in general to think not in terms of time but in terms of semantic lifetimes, mostly because fundamentally there's no general way to know if your program hangs up or completes.<sup id="cite_ref-3">[\[3\]](#cite_note-3)</sup>
+In context of this discussion some argue it is possible to implement `core::mem::forget` via threads and an infinite loop.<sup id="cite_ref-2">[\[2\]](#cite_note-2)</sup> That forget implementation won't violate a drop guarantee as defined above, since either you use regular threads which require `F: 'static` or use scoped threads which would join this never completing thread thus no drop and no lifetime end. My further advice would be in general to think not in terms of time but in terms of semantic lifetimes, mostly because fundamentally there's no general way to know if your program hangs up or completes.<sup id="cite_ref-3">[\[3\]](#cite_note-3)</sup>
 
-To move forward let's determine required conditions for drop guarantee. Drop is only ever run on owned values, so for a drop to run on a value, **the value should preserve transitive ownership of it by a function stack/local values**. If you familiar with [tracing garbage collection](https://en.wikipedia.org/wiki/Garbage_collection_(computer_science)#Tracing) this is similair to it, so that the required alive value should be traceable from function stack. Also **the value has to not own itself or be owned by something that would own itself**, at least before the end of its bounding lifetime, otherwise drop would not be called.
+<!-- Need to mention, that in general the dynamic (runtime) "deadline" until which the destructor -->
+<!-- should run may make sense, but we think that a static (compile time) deadline aka Rust lifetime `'a` -->
+<!-- would be sufficient to be useful. -->
+
+<!-- Also need to mention that `trait Leak<'a>` can be potentially defined with a lifetime, meaning that -->
+<!-- the value should be destroyed until `'a`, which may be smaller than the value's own lifetime, -->
+<!-- but we are not sure whether it would be useful in practice -->
+
+To move forward let's determine required conditions for drop guarantee. Drop is only ever run on owned values, so for a drop to run on a value, **the value should preserve transitive ownership of it by a function stack/local values**. If you familiar with [tracing garbage collection](https://en.wikipedia.org/wiki/Garbage_collection_(computer_science)#Tracing) this is similar to it, so that the required alive value should be traceable from function stack. Also **the value has to not own itself or be owned by something that would own itself**, at least before the end of its bounding lifetime, otherwise drop would not be called.
+
+<!-- Assignment `*a = b` will run drop on `a`, despite it being mutably borrowed rather than owned -->
 
 ## Trivial implementation
 
-One trivial implementation might have already creeped into your mind.
+One trivial implementation might have already crept into your mind.
 
 ```rust
 unsafe auto trait Leak {}
 ```
 
-This is an automatic trait, which would mean that it is implemented for types in a similair manner to `Send`.<sup id="cite_ref-4">[\[4\]](#cite_note-4)</sup> Name `Leak` is a subject for a possible future change. I used it as it came up in many people's thoughts as `Leak`. Since `T: !Leak` types possibly could leak in a practical meaning, it can be renamed into `Forget`. Other variants could be `Lose`, `!Trace` or `!Reach` (last two as in tracing GC), maybe add `-able` suffix?
+This is an automatic trait, which would mean that it is implemented for types in a similar manner to `Send`.<sup id="cite_ref-4">[\[4\]](#cite_note-4)</sup> Name `Leak` is a subject for a possible future change. I used it as it came up in many people's thoughts as `Leak`. Since `T: !Leak` types possibly could leak in a practical meaning, it can be renamed into `Forget`. Other variants could be `Lose`, `!Trace` or `!Reach` (last two as in tracing GC), maybe add `-able` suffix?
 
-This trait would help to forbid `!Leak` values use problematic functionality. First, the `core::mem::forget` will have this bound over its generic type argument. Second, most data structures introducing shared ownership will be limited or disabled for `!Leak` types, things like `Rc`, `Arc`, various channel types having some shared buffer like inside of `std::sync::mpsc` module. That is because reference counted types can be moved into themselves or send your receiver into shared buffer with some value to be leaked (synchronous(?) rendezvous channels seem to not have this issue). However, there is a decision to be made about what parts of API should be restricted and which should not: type contructors, `Rc::clone` or type itself?
+This trait would help to forbid `!Leak` values from using problematic functionality. First, the `core::mem::forget` will have this bound over its generic type argument. Second, most data structures introducing shared ownership will be limited or disabled for `!Leak` types, things like `Rc`, `Arc`, various channel types having some shared buffer like inside of `std::sync::mpsc` module. That is because reference counted types can be moved into themselves or send your receiver into shared buffer with some value to be leaked (synchronous(?) rendezvous channels seem to not have this issue). However, there is a decision to be made about what parts of API should be restricted and which should not: type constructors, `Rc::clone` or type itself?
+
+<!-- It would be better to all all the code examples with channels, Rc, etc, that you wrote, to some repo -->
+<!-- and link to it from this post -->
+
+<!-- Also worth mentioning that putting the bound on `Rc` itself would prohibit real life use cases -->
+<!-- with a private set of `Rc`s that the user can promise to not use for creating leaking cycles, -->
+<!-- like with `Rc`s containing futures in async runtimes (mentioned by withoutboats in some post) -->
+
+<!-- Also need to mention `ManuallyDrop` somewhere -->
+
+<!-- And make the difference between forget/Rc/etc and things like thread sleeping more prominent -->
+<!-- the former can keep a value alive (even if inaccessible) beyond its lifetime and the latter cannot -->
+<!-- So only the former needs to be enhanced with `Leak` bounds -->
 
 Given that `!Leak` implies new restrictions compared to current rust value semantics, by default every type is assumed to be `T: Leak`, kinda like with `Sized`, e.g. implicit `Leak` trait bound on every type and type argument unless specified otherwise (`T: ?Leak`). I pretty sure this feature should not introduce any breaking changes. There could be a way to disable implicit `T: Leak` bounds between editions, although I do not see it as a desirable change, since `!Leak` types would be a small minority in my vision.
 
-One thing that we should be aware of in the future would be users' desire of making their types `!Leak` while not actually needing. The appropriate example would be `MutexGuard<'a, T>` being `!Leak`. It is not required, since it is actually safe to forget a value of this type or to never unlock a mutex, but it can exist. In this case, you can safely violate `!Leak` bound, making it useless in practice. Thus unnecessary `!Leak` impls should be avoided. To address users' underlying itch to do this, they should be informed that forgetting or leaking a value is already undesirable and may be considered a logic bug.
+<!-- Probably better to say that even if backward compatibility issues are found, we won't focus on them -->
+<!-- in this specific post, because this post is focused on different things -->
+
+One thing that we should be aware of in the future would be users' desire of making their types `!Leak` while not actually needing it. The appropriate example would be `MutexGuard<'a, T>` being `!Leak`. It is not required, since it is actually safe to forget a value of this type or to never unlock a mutex, but it can exist. In this case, you can safely violate `!Leak` bound, making it useless in practice. Thus unnecessary `!Leak` impls should be avoided. To address users' underlying itch to do this, they should be informed that forgetting or leaking a value is already undesirable and may be considered a logic bug.
 
 Of course there should be an unsafe `core::mem::forget_unchecked` for any value if you really know what you're doing, there are some ways to implement `core::mem::forget` for any type with unsafe code still, for example with `core::ptr::write`. There should also probably be safe `core::mem::forget_static` since you can basically do that using thread with an endless loop. However `!Leak` types should implement `Leak` for static lifetimes themselves to satisfy any function's bounds over types.
 
@@ -53,7 +81,7 @@ struct JoinGuard<'a, T: 'a> { /* ... */ }
 unsafe impl<T: 'static> Leak for JoinGuard<'static, T> {}
 ```
 
-One interesting case comes up when thinking about types [contravariant](https://doc.rust-lang.org/reference/subtyping.html) by their generic argument lifetime. Since this lifetime can be extended into `'static` you should implement `Leak` then for any possible lifetime in this position.
+One interesting case comes up when thinking about types [contravariant](https://doc.rust-lang.org/reference/subtyping.html) by their generic lifetime argument. Since this lifetime can be extended into `'static` you should implement `Leak` then for any possible lifetime in this position.
 
 ```rust
 struct ContravariantLifetime<'contravariant, 'covariant> {

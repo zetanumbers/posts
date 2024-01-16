@@ -236,13 +236,13 @@ acording to the type invariant. It should be safe to make some type
 `!Leak` with dummy types, so we cannot put a requirement prohibiting
 panic within drop for `!Leak` types. This leaves us with abort on a
 drop panic, which would propagate to any type containing `!Leak` value
-too. Still, interactions with generic `T: ?Leak` types remain unclear as
-to dynamically differentiate between `Leak` and `!Leak` types or not.
-On the other side any safety invariant violation could only be caused
-by unsafe code, so we can retain old behaviour of drop and define the
-drop panic of `!Leak` types to being a valid cleanup, assuming inner
-fields are dropped too after that or abort happened, so you have to be
-carefull with panics too.
+too. Still, interactions with generic `T: ?Leak` types remain unclear
+as to dynamically differentiate between `Leak` and `!Leak` types or not.
+On the other side any safety invariant violation could only be caused by
+unsafe code, so we can retain old behaviour of drop and define the drop
+panic of `!Leak` types to being a valid cleanup, assuming inner fields
+are dropped too after that or abort happened, so **you would have to be
+careful with panics too**.
 
 ## Extensions and alternatives
 

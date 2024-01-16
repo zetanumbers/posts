@@ -140,10 +140,22 @@ so maybe it would be helpful to add a covariant lifetime parameter into
 `PhantomUnleak` definition too:
 
 ```rust
+#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PhantomUnleak<'a>(PhantomData<&'a ()>, PhantomStaticUnleak);
+
+impl<'a> std::fmt::Debug for PhantomUnleak<'a> { /* ... */ }
+
+impl<'a> PhantomUnleak<'a> {
+    pub const fn new() -> Self {
+        PhantomUnleak(PhantomData, PhantomStaticUnleak)
+    }
+}
+
 unsafe impl Leak for PhantomUnleak<'static> {}
 
-struct PhantomStaticUnleak(());
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct PhantomStaticUnleak;
+
 impl !Leak for PhantomStaticUnleak {}
 ```
 
@@ -186,15 +198,15 @@ any value if you really know what you're doing, there are some ways
 to implement `core::mem::forget` for any type with unsafe code still,
 for example with `core::ptr::write`. There should also probably be safe
 `core::mem::forget_static` since you can basically do that using thread
-with an endless loop. However `!Leak` types should implement `Leak` for
-static lifetimes themselves to satisfy any function's bounds over types.
+with an endless loop. However `?Leak` types implement `Leak` for static
+lifetimes transitively from `PhantomUnleak` to satisfy any function's
+bounds over types.
 
 ```rust
 struct JoinGuard<'a, T: 'a> {
     // ...
-    _unleak: PhantomUnleak,
+    _unleak: PhantomUnleak<'a>,
 }
-unsafe impl<T: 'static> Leak for JoinGuard<'static, T> {}
 ```
 
 One interesting case comes up when thinking about types
@@ -206,9 +218,9 @@ this position.
 ```rust
 struct ContravariantLifetime<'contravariant, 'covariant> {
     // ...
-    _variance: PhantomData<fn(&'contravariant ()) -> &'covariant ()>
+    _variance: PhantomData<fn(&'contravariant ()) -> &'covariant ()>,
+    _unleak: PhantomUnleak<'covariant>,
 }
-unsafe impl<'contravariant> Leak for ContravariantLifetime<'contravariant, 'static> {}
 ```
 
 While implementing `!Leak` types you should also make sure you cannot move
@@ -218,7 +230,14 @@ creating a reference to itself, thus escaping from a parent thread while
 having live references to parent thread local variables.
 
 ```rust
-unsafe impl<T: 'static> Send for JoinGuard<'static, T> {}
+struct JoinGuard<'a, T: 'a> {
+    // ...
+    _unleak: PhantomUnleak<'a>,
+    _unsend: PhantomData<*mut ()>,
+}
+
+unsafe impl<'a, T> Send for JoinGuard<'a, T> where Self: Leak {}
+unsafe impl<'a, T> Sync for JoinGuard<'a, T> {}
 ```
 
 There is also a way to forbid `JoinGuard` from moving into its thread

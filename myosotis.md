@@ -136,11 +136,12 @@ of API should be restricted and which should not: type contructors,
 Given that `!Leak` implies new restrictions compared to current rust
 value semantics, by default every type is assumed to be `T: Leak`, kinda
 like with `Sized`, e.g. implicit `Leak` trait bound on every type and
-type argument unless specified otherwise (`T: ?Leak`). I pretty sure
-this feature should not introduce any breaking changes. There could be
-a way to disable implicit `T: Leak` bounds between editions, although
-I do not see it as a desirable change, since `!Leak` types would be a
-small minority in my vision.
+type argument unless specified otherwise (`T: ?Leak`). I pretty sure this
+feature should not introduce any breaking changes. This means working with
+new `!Leak` types is opt-in, kinda like library APIs may consider adding
+`?Sized` support after release. There could be a way to disable implicit
+`T: Leak` bounds between editions, although I do not see it as a desirable
+change, since `!Leak` types would be a small minority in my vision.
 
 One thing that we should be aware of in the future would be users' desire
 of making their types `!Leak` while not actually needing. The appropriate

@@ -133,8 +133,21 @@ practical meaning, it can be renamed into `Forget`. Other variants could
 be `Lose`, `!Trace` or `!Reach` (last two as in tracing GC), maybe add
 `-able` suffix?
 
-By analogy with `trait Unpin` and `struct PhantomPinned`, there should
-probably be `struct PhantomUnleak`.
+By analogy with `Unpin` trait and `PhantomPinned` struct, there should
+probably be `PhantomUnleak`, otherwise you could use some dummy `!Leak`
+type As I've said previously, `T: !Leak + 'static` types are meaningless,
+so maybe it would be helpful to add a covariant lifetime parameter into
+`PhantomUnleak` definition too:
+
+```rust
+pub struct PhantomUnleak<'a>(PhantomData<&'a ()>, PhantomStaticUnleak);
+unsafe impl Leak for PhantomUnleak<'static> {}
+
+struct PhantomStaticUnleak(());
+impl !Leak for PhantomStaticUnleak {}
+```
+
+Will `PhantomStaticUnleak` ever be public/stable is to be determined.
 
 This trait would help to forbid `!Leak` values from using problematic
 functionality. First, the `core::mem::forget` will have this bound over

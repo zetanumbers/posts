@@ -58,11 +58,13 @@ trivial case this is the same as once deleted `std::thread::{scoped,
 JoinGuard}` described above. However, many C APIs may in some
 sense use this via the <dfn id="intro-callback_registration">
 [callback registration](#term-callback_registration) </dfn>
-pattern, most common for multithreaded client handles. Absence of
-a drop guarantee thus implies `'static` lifetime for a callback
-so that the user wouldn't use invalidated references inside
-of the callback, if client uses guard object API pattern ([see
+pattern, most common for multithreaded client handles. Absence
+of a drop guarantee thus implies `'static` lifetime for a
+callback so that the user wouldn't use invalidated references
+inside of the callback, if client uses guard object API pattern ([see
 example](https://docs.rs/tigerbeetle-unofficial-core/latest/tigerbeetle_unofficial_core/struct.Client.html#method.with_callback)).
+It could be the case that `JoinGuard` logic can be extended to analogous
+`AwaitGuard` representing async tasks.
 
 ## Solution
 
@@ -91,15 +93,25 @@ time but in terms of semantic lifetimes, mostly because fundamentally
 there's no general way to know if your program hangs up or completes.<sup
 id="cite_ref-3">[\[3\]](#cite_note-3)</sup>
 
+On the topic of abort, it shouldn't be considered an end to any lifetime,
+since otherwise abort and even spontaious termination of a program like
+SIGTERM becomes unsafe.
+
 To move forward let's determine required conditions for drop
 guarantee. Drop is only ever run on owned values, so for a drop to
 run on a value, **the value should preserve transitive ownership of it
 by a function stack/local values**. If you familiar with [tracing garbage
 collection](https://en.wikipedia.org/wiki/Garbage_collection_(computer_science)#Tracing)
 this is similar to it, so that the required alive value should be
-traceable from function stack. Also **the value has to not own itself
-or be owned by something that would own itself**, at least before the
-end of its bounding lifetime, otherwise drop would not be called.
+traceable from function stack. **The value has to not own itself or be
+owned by something that would own itself**, at least before the end of
+its bounding lifetime, otherwise drop would not be called. Last statement
+could be simplified, given that **owner of a value must also satisfy
+these requirements**, leaving us with just "the value has to not own
+itself" part. Also reminding you that `'static` values can be moved into
+static context like static variables, which lifetime exceedes lifetime
+of a program's execution itself, so consider that analogous to calling
+`std::process::abort()` before `'static` ends.
 
 ## Trivial implementation
 
@@ -193,12 +205,28 @@ having live references to parent thread local variables.
 unsafe impl<T: 'static> Send for JoinGuard<'static, T> {}
 ```
 
-There is also a way to forbid `JoinGuard` from moving into its
-thread if we bound it by a different lifetime which is shorter than
-input closure's lifetime (see `JoinGuardScoped` in leak-playground
+There is also a way to forbid `JoinGuard` from moving into its thread
+if we bound it by a different lifetime which is shorter than input
+closure's lifetime. See prototyped `JoinGuardScoped` in leak-playground
 [docs](https://zetanumbers.github.io/leak-playground/leak_playground/)
-and [repo](https://github.com/zetanumbers/leak-playground), it works
-and does not when needed, but I'm not sure without an actual proof).
+and [repo](https://github.com/zetanumbers/leak-playground). There's no
+proposed `Leak` trait, so conditions are enforced manually. It works
+and does not when needed, but I'm not sure without an actual proof.
+
+One other decision to be made about handling a panic during a drop of a
+`!Leak` value. Panic in this case could indicate a failure of a drop
+implementation, thus state of borrowed values might remain invalid
+acording to the type invariant. It should be safe to make some type
+`!Leak` with dummy types, so we cannot put a requirement prohibiting
+panic within drop for `!Leak` types. This leaves us with abort on a
+drop panic, which would propagate to any type containing `!Leak` value
+too. Still, interactions with generic `T: ?Leak` types remain unclear as
+to dynamically differentiate between `Leak` and `!Leak` types or not.
+On the other side any safety invariant violation could only be caused
+by unsafe code, so we can retain old behaviour of drop and define the
+drop panic of `!Leak` types to being a valid cleanup, assuming inner
+fields are dropped too after that or abort happened, so you have to be
+carefull with panics too.
 
 ## Extensions and alternatives
 

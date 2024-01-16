@@ -4,7 +4,7 @@
 
 ## Background
 
-Currently there is a consensus about abscence of the drop
+Currently there is a consensus about absence of the drop
 guarantee. To be precise, in today's Rust you can forget some value via
 [`core::mem::forget`](https://doc.rust-lang.org/1.75.0/core/mem/fn.forget.html)
 or via some other safe contraption like cyclic shared references `Rc/Arc`.
@@ -38,7 +38,7 @@ and define what does leak actually mean.
 
 There is a class of problems that we will try to solve. In particular,
 we return some object from a function or a method that mutably
-(exclusivelly) borrows one of function arguments. While returned object
+(exclusively) borrows one of function arguments. While returned object
 is alive we could not refer to borrowed value, which can be a useful
 property to exploit. You can invalidate some invariant of a borrowed
 type but then you restore it inside of returned object's drop. This
@@ -76,7 +76,7 @@ after its drop. Somehow breaking this guarantee can lead to UB.
 
 Notice what this implies for `T: 'static` types. Since static lifetime
 never ends, the drop may never be called. This property does not conflict
-with described usecases. `JoinGuard<'static, T>` indeed doesn't requre
+with described use cases. `JoinGuard<'static, T>` indeed doesn't requre
 a drop guarantee, since there would be no references what would ever
 invalidate.
 

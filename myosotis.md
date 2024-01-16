@@ -86,28 +86,32 @@ id="cite_ref-2">[\[2\]](#cite_note-2)</sup> That forget implementation
 won't violate a drop guarantee as defined above, since either you use
 regular threads which require `F: 'static` or use scoped threads which
 would join this never completing thread thus no drop and no lifetime
-end. **That definition only establishes order between drop and end of a
-lifetime, but not existence of a lifetime's end inside of any execution
-time.** My further advice would be in general to **think not in terms
-of execution time but in terms of semantic lifetimes**, which role would
-be to conservatively establish order of events if those ever exist.
+end. **That definition only establishes order between drop and end
+of a lifetime, but not existence of a lifetime's end inside of any
+execution time.** My further advice would be in general to **think not
+in terms of execution time but in terms of semantic lifetimes**, which
+role would be to conservatively establish order of events if those ever
+exist. Alternatively you will be fundamentally limited by the [halting
+problem](https://en.wikipedia.org/wiki/Halting_problem).
 
 On the topic of abort, it shouldn't be considered an end to any lifetime,
 since otherwise abort and even spontaious termination of a program like
 SIGTERM becomes unsafe.
 
 To move forward let's determine required conditions for drop
-guarantee. Drop is only ever run on owned values, so for a drop to
-run on a value, **the value should preserve transitive ownership of it
-by a function stack/local values**. If you familiar with [tracing garbage
+guarantee. Rust language already makes sure you could never
+use a value which bounding lifetime has ended. Drop is only
+ever run on owned values, so for a drop to run on a value,
+**the value should preserve transitive ownership of it by
+functions' stack/local values**. If you familiar with [tracing garbage
 collection](https://en.wikipedia.org/wiki/Garbage_collection_(computer_science)#Tracing)
 this is similar to it, so that the required alive value should be
-traceable from function stack. **The value has to not own itself or be
-owned by something that would own itself**, at least before the end of
-its bounding lifetime, otherwise drop would not be called. Last statement
-could be simplified, given that **owner of a value must also satisfy
-these requirements**, leaving us with just "the value has to not own
-itself" part. Also reminding you that `'static` values can be moved into
+traceable from function stack. The value has to not own itself or be
+owned by something that would own itself, at least before the end of its
+bounding lifetime, otherwise drop would not be called. Last statement
+could be simplified, given that **owner of a value transitively must also
+satisfy these requirements**, leaving us with just **the value has to not
+own itself**. Also reminding you that `'static` values can be moved into
 static context like static variables, which lifetime exceedes lifetime
 of a program's execution itself, so consider that analogous to calling
 `std::process::abort()` before `'static` ends.

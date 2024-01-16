@@ -133,35 +133,6 @@ practical meaning, it can be renamed into `Forget`. Other variants could
 be `Lose`, `!Trace` or `!Reach` (last two as in tracing GC), maybe add
 `-able` suffix?
 
-By analogy with `Unpin` trait and `PhantomPinned` struct, there should
-probably be `PhantomUnleak`, otherwise you could use some dummy `!Leak`
-type As I've said previously, `T: !Leak + 'static` types are meaningless,
-so maybe it would be helpful to add a covariant lifetime parameter into
-`PhantomUnleak` definition too, with `Leak` implementation for `'static`
-case:
-
-```rust
-#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct PhantomUnleak<'a>(PhantomData<&'a ()>, PhantomStaticUnleak);
-
-impl<'a> std::fmt::Debug for PhantomUnleak<'a> { /* ... */ }
-
-impl<'a> PhantomUnleak<'a> {
-    pub const fn new() -> Self {
-        PhantomUnleak(PhantomData, PhantomStaticUnleak)
-    }
-}
-
-unsafe impl Leak for PhantomUnleak<'static> {}
-
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct PhantomStaticUnleak;
-
-impl !Leak for PhantomStaticUnleak {}
-```
-
-Will `PhantomStaticUnleak` ever be public/stable is to be determined.
-
 This trait would help to forbid `!Leak` values from using problematic
 functionality. First, the `core::mem::forget` will have this bound over
 its generic type argument. Second, most data structures introducing shared
@@ -183,6 +154,34 @@ new `!Leak` types is opt-in, kinda like library APIs may consider adding
 `?Sized` support after release. There could be a way to disable implicit
 `T: Leak` bounds between editions, although I do not see it as a desirable
 change, since `!Leak` types would be a small minority in my vision.
+
+To make `!Leak` struct you would need to use new `Unleak` wrapper type:
+
+
+```rust
+// Some usage of Unleak, probably move JoinGuard there
+
+// Unleak definition
+
+#[repr(transparent)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Unleak<T>(pub T, PhantomUnleak);
+
+impl<T> Unleak<T> {
+    pub const fn new(v: T) -> Self {
+        Unleak(v, PhantomUnleak)
+    }
+}
+
+unsafe impl<T: 'static> Leak for Unleak<T> {}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct PhantomUnleak;
+
+impl !Leak for PhantomUnleak {}
+```
+
+Will `PhantomUnleak` ever be public/stable is to be determined.
 
 One thing that we should be aware of in the future would be users'
 desire of making their types `!Leak` while not actually needing it. The
@@ -206,7 +205,8 @@ bounds over types.
 ```rust
 struct JoinGuard<'a, T: 'a> {
     // ...
-    _unleak: PhantomUnleak<'a>,
+    _marker: PhantomData<fn() -> T>, // TODO: figure out
+    _unleak: Unleak<PhantomData<&'a ()>>,
 }
 ```
 
@@ -219,8 +219,8 @@ this position.
 ```rust
 struct ContravariantLifetime<'contravariant, 'covariant> {
     // ...
-    _variance: PhantomData<fn(&'contravariant ()) -> &'covariant ()>,
-    _unleak: PhantomUnleak<'covariant>,
+    _variance: PhantomData<fn(&'contravariant ())>,
+    _unleak: Unleak<PhantomData<&'covariant ()>>,
 }
 ```
 
@@ -233,7 +233,8 @@ having live references to parent thread local variables.
 ```rust
 struct JoinGuard<'a, T: 'a> {
     // ...
-    _unleak: PhantomUnleak<'a>,
+    _marker: PhantomData<fn() -> T>, // TODO: figure out
+    _unleak: Unleak<PhantomData<&'a ()>>,
     _unsend: PhantomData<*mut ()>,
 }
 

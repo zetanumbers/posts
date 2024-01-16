@@ -63,8 +63,6 @@ of a drop guarantee thus implies `'static` lifetime for a
 callback so that the user wouldn't use invalidated references
 inside of the callback, if client uses guard object API pattern ([see
 example](https://docs.rs/tigerbeetle-unofficial-core/latest/tigerbeetle_unofficial_core/struct.Client.html#method.with_callback)).
-It could be the case that `JoinGuard` logic can be extended to analogous
-`AwaitGuard` representing async tasks.
 
 ## Solution
 
@@ -88,10 +86,11 @@ id="cite_ref-2">[\[2\]](#cite_note-2)</sup> That forget implementation
 won't violate a drop guarantee as defined above, since either you use
 regular threads which require `F: 'static` or use scoped threads which
 would join this never completing thread thus no drop and no lifetime
-end. My further advice would be in general to think not in terms of
-time but in terms of semantic lifetimes, mostly because fundamentally
-there's no general way to know if your program hangs up or completes.<sup
-id="cite_ref-3">[\[3\]](#cite_note-3)</sup>
+end. **That definition only establishes order between drop and end of a
+lifetime, but not existence of a lifetime's end inside of any execution
+time.** My further advice would be in general to **think not in terms
+of execution time but in terms of semantic lifetimes**, which role would
+be to conservatively establish order of events if those ever exist.
 
 On the topic of abort, it shouldn't be considered an end to any lifetime,
 since otherwise abort and even spontaious termination of a program like
@@ -123,7 +122,7 @@ unsafe auto trait Leak {}
 
 This is an automatic trait, which would mean that it is
 implemented for types in a similar manner to `Send`.<sup
-id="cite_ref-4">[\[4\]](#cite_note-4)</sup> Name `Leak` is a subject
+id="cite_ref-3">[\[3\]](#cite_note-3)</sup> Name `Leak` is a subject
 for a possible future change. I used it as it came up in many people's
 thoughts as `Leak`. Since `T: !Leak` types possibly could leak in a
 practical meaning, it can be renamed into `Forget`. Other variants could
@@ -230,17 +229,22 @@ carefull with panics too.
 
 ## Extensions and alternatives
 
-### Ranked Leak trait
+*This section is optional as it contains unpolished concepts, which is
+not essential understanding the overall design of proposed feature.*
 
 ### Disowns trait
 
-<!-- TODO: custom auto traits -->
+<!-- TODO: custom SafeForRC traits -->
 
 ### NeverGives trait
+
+### Ranked Leak trait
 
 ## Forward compatibility
 
 <!-- TODO: Drop but not AsyncDrop, possible generalization as a cleanup code -->
+It could be the case that `JoinGuard` logic can be extended to analogous
+`AwaitGuard` representing async tasks.
 
 ## Possible problems
 
@@ -383,6 +387,4 @@ TODO
 
 2. <a href="#cite_ref-2" id="cite_note-2" title="Jump up">^</a> [Yoshua Wuyts - Linear Types One-Pager # Updates](https://blog.yoshuawuyts.com/linear-types-one-pager/#updates)
 
-3. <a href="#cite_ref-3" id="cite_note-3" title="Jump up">^</a> [wikipedia.org - Halting_problem](https://en.wikipedia.org/wiki/Halting_problem)
-
-4. <a href="#cite_ref-4" id="cite_note-4" title="Jump up">^</a> [unstable book - auto-traits](https://doc.rust-lang.org/beta/unstable-book/language-features/auto-traits.html)
+3. <a href="#cite_ref-3" id="cite_note-3" title="Jump up">^</a> [unstable book - auto-traits](https://doc.rust-lang.org/beta/unstable-book/language-features/auto-traits.html)

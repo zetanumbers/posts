@@ -294,6 +294,20 @@ we can forget values or not and then act accordingly.
 There could also be some niche compilation case, where compiler assumes
 every type is `Leak` and purposefully forgets a value.
 
+<!--
+
+## Discarded ideas
+
+*This section may confuse readers so you might not want to skip it. It
+is intended to be refered to when discussion touches these thought of
+before but then discarded ideas.*
+
+### Leak<'a>
+
+I cannot describe this
+
+-->
+
 ## Conclusion
 
 <!-- TODO: this is very promising -->

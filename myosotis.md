@@ -341,13 +341,78 @@ different problem.
 *This section is optional as it contains unpolished concepts, which is
 not essential understanding the overall design of proposed feature.*
 
-### Disowns trait
+### Disowns (and NeverGives) trait(s)
 
-<!-- TODO: custom SafeForRC traits -->
+If you think about `Rc` long enough, the `T: Leak` bound will start to
+feel uneccessary strong. Maybe we could add a trait that signify that you
+type can never own `Rc` of self, which would allow us to have a new bound:
 
-### NeverGives trait
+```rust
+impl<T> Rc<T> {
+    fn new(v: T) -> Self
+    where
+        T: Disownes<Rc<T>>
+    {
+        // ...
+    }
+}
+```
+
+By analogy with that to make sure closure that you pass into a spawned
+thread should never capture anything that can give you join guard:
+
+```rust
+pub fn scoped<F>(f: F) -> JoinGuard<F>
+where
+    F: NeverGives<JoinGuard<F>>
+{
+    // ...    
+}
+```
+
+To help you with understanding:
+
+```
+<fn(T)>: NeverGives<T> + Disownes<T>,
+<fn() -> T>: !NeverGives<T> + Disownes<T>,
+T: !NeverGives<T> + !Disownes<T>,
+trait NeverGives<T>: Disownes<T>,
+```
+
+### Custom Rc trait
+
+Or, to generalize, maybe there should be a custom automatic trait for Rc, so
+that anything that implements it is safely allowed to be held witin `Rc`:
+
+```rust
+impl<T> Rc<T> {
+    fn new(v: T) -> Self
+    where
+        T: AllowedInRc
+    {
+        // ...
+    }
+}
+
+impl<T> Arc<T> {
+    fn new(v: T) -> Self
+    where
+        T: AllowedInRc + Send + Sync
+    {
+        // ...
+    }
+}
+```
 
 ### Ranked Leak trait
+
+While we may allow `T: Leak` types to be held within `Rc`, `U:
+Leak2` would be not given that `Rc<T>: Leak2`. And so on. This
+allows us to forbid recursive types but also nested enough
+within `Rc`s structs. This is similar to [von Neumann hierarchy of
+sets](https://en.wikipedia.org/wiki/Von_Neumann_universe) as sets there
+have some rank ordinal. Maybe there could be `unsafe auto trait Leak<const
+N: usize> {}` for that?
 
 ### Turning drop invocations into compiler errors
 

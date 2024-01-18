@@ -390,11 +390,6 @@ I cannot describe this
 
 -->
 
-## Conclusion
-
-<!-- TODO: this is very promising -->
-<!-- TODO: one step towards linear types -->
-
 ## Terminology
 
 <dl>

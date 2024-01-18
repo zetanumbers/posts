@@ -306,11 +306,13 @@ fn _internal_join_guard_future() -> impl std::future::Future<Output = ()> + Leak
 }
 ```
 
-Code above may lead to UB if we `forget` this future, meaning the memory
-holding this future is deallocated without dropping this future first. But
-remember that self-referencial (`!Unpin`) future after it starts is
-pinned forever, which means it is guaranteed there is/should be no way
-to forget and deallocate underlying value in safe code (see pin's [drop
+Code above may lead to UB if we `forget` this future, meaning
+the memory holding this future is deallocated without dropping
+this future first because spawned thread may refer to future's
+local state if not joined. But remember that self-referential
+(`!Unpin`) future after it starts is pinned forever, which
+means it is guaranteed there is/should be no way to forget
+and deallocate underlying value in safe code (see pin's [drop
 guarantee](https://doc.rust-lang.org/std/pin/index.html#drop-guarantee)).
 However outside of rust-lang project some people would not follow this
 rule because they don't know about it or maybe discard it puposefuly

@@ -63,7 +63,7 @@ pattern, most common for multithreaded client handles. Absence
 of a drop guarantee thus implies `'static` lifetime for a
 callback so that the user wouldn't use invalidated references
 inside of the callback, if client uses guard object API pattern ([see
-example](https://docs.rs/tigerbeetle-unofficial-core/latest/tigerbeetle_unofficial_core/struct.Client.html#method.with_callback)).
+example](https://docs.rs/tigerbeetle-unofficial-core/0.3.0+0.13.133/tigerbeetle_unofficial_core/struct.Client.html#method.with_callback)).
 
 ## Solution
 
@@ -396,7 +396,8 @@ I cannot describe this
 
 <dd>
 
-value of which should be used at least once, generally speaking. TODO
+Value of which should be used at least once, generally speaking. Use is
+usually defined within the context.
 
 </dd>
 
@@ -508,7 +509,11 @@ TODO
 
 <dd>
 
-TODO
+A pattern of library APIs, especially in
+C. It is usually represented as setting some
+function as a callback to incoming response for some client handle.
+[tigerbeetle_unofficial_core::Client](https://docs.rs/tigerbeetle-unofficial-core/0.3.0+0.13.133/tigerbeetle_unofficial_core/struct.Client.html)
+would be an example of that.
 
 </dd>
 
@@ -516,7 +521,8 @@ TODO
 
 <dd>
 
-TODO
+[Wikipedia explains it better than
+me.](https://en.wikipedia.org/wiki/Undefined_behavior)
 
 </dd>
 

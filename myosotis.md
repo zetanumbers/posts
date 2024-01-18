@@ -346,8 +346,9 @@ different problem.
 
 ## Extensions and alternatives
 
-*This section is optional as it contains unpolished concepts, which is
-not essential understanding the overall design of proposed feature.*
+*DISCLAIMER: This section is optional as it contains unpolished concepts,
+which are not essential for understanding the overall design of proposed
+feature.*
 
 ### Disowns (and NeverGives) trait(s)
 

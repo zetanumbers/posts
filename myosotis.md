@@ -138,12 +138,14 @@ functionality. First, the `core::mem::forget` will have this bound over
 its generic type argument. Second, most data structures introducing shared
 ownership will be limited or disabled for `!Leak` types, things like `Rc`,
 `Arc`, various channel types having some shared buffer like inside of
-`std::sync::mpsc` module. That is because reference counted types can
-be moved into themselves or send your receiver into shared buffer with
-some value to be leaked (synchronous(?) rendezvous channels seem to not
-have this issue). However, there is a decision to be made about what
-parts of API should be restricted to `T: Leak` and which should not:
-type constructors, `Rc::clone` or type itself?
+`std::sync::mpsc` module. That is because reference counted types can be
+moved into themselves or send your receiver into shared buffer with some
+value to be leaked (synchronous(?) rendezvous channels seem to not have
+this issue). However, there is a decision to be made about what parts
+of API should be restricted to `T: Leak` and which should not: type
+constructors, `Rc::clone` or type itself? It is safe to use `Rc` with
+`T: ?Leak` if we make sure we won't leak any `Rc` value, so I would say
+`Rc::new_unchecked` for `?Leak` types is appropriate.
 
 Given that `!Leak` implies new restrictions compared to current rust
 value semantics, by default every type is assumed to be `T: Leak`, kinda

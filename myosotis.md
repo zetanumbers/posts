@@ -76,7 +76,7 @@ after its drop. Somehow breaking this guarantee can lead to UB.
 
 Notice what this implies for `T: 'static` types. Since static lifetime
 never ends, the drop may never be called. This property does not conflict
-with described use cases. `JoinGuard<'static, T>` indeed doesn't requre
+with described use cases. `JoinGuard<'static, T>` indeed doesn't require
 a drop guarantee, since there would be no references what would ever
 be invalidated.
 
@@ -95,7 +95,7 @@ exist. Alternatively you will be fundamentally limited by the [halting
 problem](https://en.wikipedia.org/wiki/Halting_problem).
 
 On the topic of abort, it shouldn't be considered an end to any lifetime,
-since otherwise abort and even spontaious termination of a program like
+since otherwise abort and even spontaneous termination of a program like
 SIGTERM becomes unsafe.
 
 To move forward let's determine required conditions for drop
@@ -112,7 +112,7 @@ bounding lifetime, otherwise drop would not be called. Last statement
 could be simplified, given that **owner of a value transitively must also
 satisfy these requirements**, leaving us with just **the value has to not
 own itself**. Also reminding you that `'static` values can be moved into
-static context like static variables, which lifetime exceedes lifetime
+static context like static variables, which lifetime exceeds lifetime
 of a program's execution itself, so consider that analogous to calling
 `std::process::abort()` before `'static` ends.
 
@@ -255,14 +255,14 @@ and does not when needed, but I'm not sure without an actual proof.
 One other decision to be made about handling a panic during a drop of a
 `!Leak` value. Panic in this case could indicate a failure of a drop
 implementation, thus state of borrowed values might remain invalid
-acording to the type invariant. It should be safe to make some type
+according to the type invariant. It should be safe to make some type
 `!Leak` with dummy types, so we cannot put a requirement prohibiting
 panic within drop for `!Leak` types. This leaves us with abort on a
 drop panic, which would propagate to any type containing `!Leak` value
 too. Still, interactions with generic `T: ?Leak` types remain unclear
 as to dynamically differentiate between `Leak` and `!Leak` types or not.
 On the other side any safety invariant violation could only be caused by
-unsafe code, so we can retain old behaviour of drop and define the drop
+unsafe code, so we can retain old behavior of drop and define the drop
 panic of `!Leak` types to being a valid cleanup, assuming inner fields
 are dropped too after that or abort happened, so **you would have to be
 careful with panics too**. In this case you can manually abort on panic.
@@ -315,7 +315,7 @@ means it is guaranteed there is/should be no way to forget
 and deallocate underlying value in safe code (see pin's [drop
 guarantee](https://doc.rust-lang.org/std/pin/index.html#drop-guarantee)).
 However outside of rust-lang project some people would not follow this
-rule because they don't know about it or maybe discard it puposefuly
+rule because they don't know about it or maybe discard it purposefully
 (the *Rust police* is coming for you). Maybe in the future it would be
 possible to somehow relax this rule in some cases, but it would be a
 different problem.
@@ -358,7 +358,7 @@ and purposefully forgets a value.
 ## Discarded ideas
 
 *This section may confuse readers so you might not want to skip it. It
-is intended to be refered to when discussion touches these thought of
+is intended to be referred to when discussion touches these thought of
 before but then discarded ideas.*
 
 ### Leak<'a>
@@ -498,3 +498,7 @@ TODO
 2. <a href="#cite_ref-2" id="cite_note-2" title="Jump up">^</a> [Yoshua Wuyts - Linear Types One-Pager # Updates](https://blog.yoshuawuyts.com/linear-types-one-pager/#updates)
 
 3. <a href="#cite_ref-3" id="cite_note-3" title="Jump up">^</a> [unstable book - auto-traits](https://doc.rust-lang.org/beta/unstable-book/language-features/auto-traits.html)
+
+## Credits
+
+Thanks to @petrochenkov for discussing this proposal with me.

@@ -147,18 +147,25 @@ be `Lose`, `!Trace` or `!Reach` (last two as in tracing GC), maybe add
 `-able` suffix?
 
 This trait would help to forbid `!Leak` values from using problematic
-functionality. First, the `core::mem::forget` will have this bound over
-its generic type argument. Second, most data structures introducing shared
-ownership will be limited or disabled for `!Leak` types, things like `Rc`,
-`Arc`, various channel types having some shared buffer like inside of
-`std::sync::mpsc` module. That is because reference counted types can be
-moved into themselves or send your receiver into shared buffer with some
-value to be leaked (synchronous(?) rendezvous channels seem to not have
-this issue). However, there is a decision to be made about what parts
-of API should be restricted to `T: Leak` and which should not: type
-constructors, `Rc::clone` or type itself? It is safe to use `Rc` with
-`T: ?Leak` if we make sure we won't leak any `Rc` value, so I would say
-`Rc::new_unchecked` for `?Leak` types is appropriate.
+functionality:
+
+ - Obviously `core::mem::forget` should have a `T: Leak` over its generic
+ type argument;
+ - `core::mem::ManuallyDrop::new` should have leak bound over input type,
+ but intrinsically maybe author has some destructor besides the drop
+ that would benefit from `ManuallyDrop::new_unchecked` fallback;
+ - `Rc` and `Arc` may themself be put inside of the contained value,
+ creating an ownership loop, although there should probably be an unsafe
+ (constructors) fallback in case ownership cycles are guaranteed to be
+ broken before cleanup;
+ - Channel types like inside of `std::sync::mpsc` with a shared buffer of
+ `T` is problematic since through sender type you can send corresponding
+ to it receiver, thus leaking that shared buffer;
+  * Rendezvous channels seem to lack this flaw because it waits for
+  other thread/task to be ready to take the value instead of running
+  off right after sending it;
+
+In any case the library itself dictates appropriate bounds for its types.
 
 Given that `!Leak` implies new restrictions compared to current rust
 value semantics, by default every type is assumed to be `T: Leak`, kinda

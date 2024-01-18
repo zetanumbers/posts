@@ -254,9 +254,10 @@ creating a reference to itself, thus escaping from a parent thread while
 having live references to parent thread local variables.
 
 ```rust
+// not sure about variance here
 struct JoinGuard<'a, T: 'a> {
     // ...
-    _marker: PhantomData<fn() -> T>, // TODO: figure out
+    _marker: PhantomData<fn() -> T>,
     _unleak: Unleak<PhantomData<&'a ()>>,
     _unsend: PhantomData<*mut ()>,
 }
@@ -575,7 +576,14 @@ a = 420
 
 <dd>
 
-TODO
+A pattern of library APIs like `std::sync::MutexGuard`. Usually these
+borrow some local state (like `std::sync::Mutex`) and restore it within
+its drop implementation. Since Rust value semantics allow objects to
+be forgotten, cleanup code within the drop implementation should not be
+essential to preserve safety of your API.
+
+However this proposal aims to relax this restriction, given a new
+backwards-compatible set of rules.
 
 </dd>
 

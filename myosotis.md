@@ -205,9 +205,10 @@ lifetimes transitively from `PhantomUnleak` to satisfy any function's
 bounds over types.
 
 ```rust
+// not sure about variance here
 struct JoinGuard<'a, T: 'a> {
     // ...
-    _marker: PhantomData<fn() -> T>, // TODO: figure out
+    _marker: PhantomData<fn() -> T>,
     _unleak: Unleak<PhantomData<&'a ()>>,
 }
 ```

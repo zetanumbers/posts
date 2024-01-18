@@ -1,16 +1,17 @@
-# The drop guarantee and linear types formulation
+# The destruction guarantee and linear types formulation
 
 <a title="Forget-me-nots - Sedum Tauno Erik, CC BY-SA 2.5 &lt;https://creativecommons.org/licenses/by-sa/2.5&gt;, via Wikimedia Commons" href="https://commons.wikimedia.org/wiki/File:Myosotis_arvensis_ois.JPG"><img width="512" alt="Myosotis arvensis ois" src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Myosotis_arvensis_ois.JPG/512px-Myosotis_arvensis_ois.JPG"></a>
 
 ## Background
 
-Currently there is a consensus about absence of the drop
-guarantee. To be precise, in today's Rust you can forget some value via
+Currently there is a consensus about absence of
+the <dfn id="intro-drop_guarantee"> [drop guarantee](#term-drop_guarantee) </dfn>. To
+be precise, in today's Rust you can forget some value via
 [`core::mem::forget`](https://doc.rust-lang.org/1.75.0/core/mem/fn.forget.html)
 or via some other safe contraption like cyclic shared references `Rc/Arc`.
 
 As you may know in the early days of Rust the
-drop guarantee was intended to exist. Instead of today's
+destruction guarantee was intended to exist. Instead of today's
 [`std::thread::scope`](https://doc.rust-lang.org/1.75.0/std/thread/fn.scope.html)
 there was
 [`std::thread::scoped`](https://doc.rust-lang.org/1.0.0/std/thread/fn.scoped.html)
@@ -66,44 +67,56 @@ example](https://docs.rs/tigerbeetle-unofficial-core/latest/tigerbeetle_unoffici
 
 ## Solution
 
-Most importantly in these two cases objects with the drop guarantee
-would be bounded by lifetime arguments. So to define the drop guarantee:
+From now on I will use the term <dfn
+id="term-destruction_guarantee">"destruction guarantee"</dfn> instead of
+the "drop guarantee" because it more precisely describes the underlying
+concept. The difference between drop and destruction is that first only
+relates to drop functionality of Rust, while latter can relate to those
+and any consuming function that destroys object in sense of how it is
+defined by library authors, in other words a <dfn>destructor</dfn>. Such
+destructors may even disable drop code and cleanup in some other way.
+
+Most importantly in these two cases objects with the destruction
+guarantee would be bounded by lifetime arguments. So to define the
+destruction guarantee:
 
 ```
-Drop guarantee asserts that bounding lifetime of an object must end only
-after its drop. Somehow breaking this guarantee can lead to UB.
+Destruction guarantee asserts that bounding lifetime of an object
+must end only after object is destroyed by drop or any other valid
+destructor. Somehow breaking this guarantee can lead to UB.
 ```
 
 Notice what this implies for `T: 'static` types. Since static lifetime
-never ends, the drop may never be called. This property does not conflict
-with described use cases. `JoinGuard<'static, T>` indeed doesn't require
-a drop guarantee, since there would be no references what would ever
-be invalidated.
+never ends or ends only after end of program's execution, the drop
+may never be called. This property does not conflict with described
+use cases. `JoinGuard<'static, T>` indeed doesn't require to ever
+be destroyed, since there would be no references what would ever be
+invalidated.
 
 In the context of discussion around `Leak` trait some argue it is possible
 to implement `core::mem::forget` via threads and an infinite loop.<sup
 id="cite_ref-2">[\[2\]](#cite_note-2)</sup> That forget implementation
-won't violate a drop guarantee as defined above, since either you use
-regular threads which require `F: 'static` or use scoped threads which
-would join this never completing thread thus no drop and no lifetime
-end. **That definition only establishes order between drop and end
-of a lifetime, but not existence of a lifetime's end inside of any
-execution time.** My further advice would be in general to **think not
-in terms of execution time but in terms of semantic lifetimes**, which
-role would be to conservatively establish order of events if those ever
-exist. Alternatively you will be fundamentally limited by the [halting
-problem](https://en.wikipedia.org/wiki/Halting_problem).
+won't violate a destruction guarantee as defined above, since either
+you use regular threads which require `F: 'static` or use scoped threads
+which would join this never completing thread thus no drop and no lifetime
+end. **That definition only establishes order between object's destruction
+and end of a lifetime, but not existence of a lifetime's end inside of
+any execution time.** My further advice would be in general to **think
+not in terms of execution time but in terms of semantic lifetimes**,
+which role would be to conservatively establish order of events if
+those ever exist. Alternatively you will be fundamentally limited by the
+[halting problem](https://en.wikipedia.org/wiki/Halting_problem).
 
 On the topic of abort, it shouldn't be considered an end to any lifetime,
 since otherwise abort and even spontaneous termination of a program like
 SIGTERM becomes unsafe.
 
-To move forward let's determine required conditions for drop
-guarantee. Rust language already makes sure you could never
-use a value which bounding lifetime has ended. Drop is only
-ever run on owned values, so for a drop to run on a value,
-**the value should preserve transitive ownership of it by
-functions' stack/local values**. If you familiar with [tracing garbage
+To move forward let's determine required conditions for destruction
+guarantee. Rust language already makes sure you could never use a
+value which bounding lifetime has ended. Drop as a fallback to other
+destructors is only ever run on owned values, so for a drop to run
+on a value, **the value should preserve transitive ownership of it
+by functions' stack/local values**. If you familiar with [tracing garbage
 collection](https://en.wikipedia.org/wiki/Garbage_collection_(computer_science)#Tracing)
 this is similar to it, so that the required alive value should be
 traceable from function stack. The value has to not own itself or be
@@ -265,10 +278,12 @@ as to dynamically differentiate between `Leak` and `!Leak` types or not.
 On the other side any safety invariant violation could only be caused by
 unsafe code, so we can retain old behavior of drop and define the drop
 panic of `!Leak` types to being a valid cleanup, assuming inner fields
-are dropped too after that or abort happened, so **you would have to be
-careful with panics too**. In this case you can manually abort on panic.
+are dropped too after that or abort happened, so **you would have to
+be careful with panics too**. In this case you can manually abort on
+panic. This also relates to any other destructor too.
 
-Consider one other example from [leak-playground](https://zetanumbers.github.io/leak-playground/leak_playground/):
+Consider one other example from
+[leak-playground](https://zetanumbers.github.io/leak-playground/leak_playground/):
 
 <div id="internal_unleak_future">
 
@@ -336,9 +351,9 @@ not essential understanding the overall design of proposed feature.*
 
 ## Forward compatibility
 
-<!-- TODO: Drop but not AsyncDrop, possible generalization as a cleanup code -->
-It could be the case that `JoinGuard` logic can be extended to analogous
-`AwaitGuard` representing async tasks.
+Since I wrote this text in terms of destructors, it should be play nicely
+with hypothetical async drop. Then it could be the case that `JoinGuard`
+logic can be extended to analogous `AwaitGuard` representing async tasks.
 
 ## Possible problems
 
@@ -382,6 +397,21 @@ I cannot describe this
 <dd>
 
 value of which should be used at least once, generally speaking. TODO
+
+</dd>
+
+<dl>
+
+<dt id="term-drop_guarantee"> <a href="#intro-drop_guarantee" title="Jump up">^</a> Drop guarantee </dt>
+
+<dd>
+
+Guarantee that drop is run on every created value unless value's drop
+is a noop.
+
+This text uses this term only in reference to older discussions. I use
+[destruction guarantee](#term-destruction_guarantee) instead to be more
+precise and to avoid confusion in future discussions about async drop.
 
 </dd>
 

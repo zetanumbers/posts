@@ -8,6 +8,6 @@ dictionaryDefinitions:
 dictionaries:
   - project-words
 ignorePaths:
-  - 'node_modules'
+  - '/*.html'
   - '/project-words.txt'
 

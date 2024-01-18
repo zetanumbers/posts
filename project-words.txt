@@ -5,6 +5,7 @@ exceeds
 impls
 jthread
 mpsc
+Neumann
 petrochenkov
 println
 repr
@@ -15,5 +16,6 @@ tigerbeetle
 unleak
 Unleak
 unsend
+usize
 Wuyts
 Yoshua

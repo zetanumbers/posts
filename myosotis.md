@@ -154,7 +154,7 @@ functionality:
  - `core::mem::ManuallyDrop::new` should have leak bound over input type,
  but intrinsically maybe author has some destructor besides the drop
  that would benefit from `ManuallyDrop::new_unchecked` fallback;
- - `Rc` and `Arc` may themself be put inside of the contained value,
+ - `Rc` and `Arc` may themselves be put inside of the contained value,
  creating an ownership loop, although there should probably be an unsafe
  (constructors) fallback in case ownership cycles are guaranteed to be
  broken before cleanup;
@@ -351,14 +351,14 @@ not essential understanding the overall design of proposed feature.*
 ### Disowns (and NeverGives) trait(s)
 
 If you think about `Rc` long enough, the `T: Leak` bound will start to
-feel uneccessary strong. Maybe we could add a trait that signify that you
+feel unnecessary strong. Maybe we could add a trait that signify that you
 type can never own `Rc` of self, which would allow us to have a new bound:
 
 ```rust
 impl<T> Rc<T> {
     fn new(v: T) -> Self
     where
-        T: Disownes<Rc<T>>
+        T: Disowns<Rc<T>>
     {
         // ...
     }
@@ -380,16 +380,16 @@ where
 To help you with understanding:
 
 ```
-<fn(T)>: NeverGives<T> + Disownes<T>,
-<fn() -> T>: !NeverGives<T> + Disownes<T>,
-T: !NeverGives<T> + !Disownes<T>,
-trait NeverGives<T>: Disownes<T>,
+<fn(T)>: NeverGives<T> + Disowns<T>,
+<fn() -> T>: !NeverGives<T> + Disowns<T>,
+T: !NeverGives<T> + !Disowns<T>,
+trait NeverGives<T>: Disowns<T>,
 ```
 
 ### Custom Rc trait
 
 Or, to generalize, maybe there should be a custom automatic trait for Rc, so
-that anything that implements it is safely allowed to be held witin `Rc`:
+that anything that implements it is safely allowed to be held within `Rc`:
 
 ```rust
 impl<T> Rc<T> {
@@ -415,11 +415,11 @@ impl<T> Arc<T> {
 
 While we may allow `T: Leak` types to be held within `Rc`, `U:
 Leak2` would be not given that `Rc<T>: Leak2`. And so on. This
-allows us to forbid recursive types but also nested enough
-within `Rc`s structs. This is similar to [von Neumann hierarchy of
-sets](https://en.wikipedia.org/wiki/Von_Neumann_universe) as sets there
-have some rank ordinal. Maybe there could be `unsafe auto trait Leak<const
-N: usize> {}` for that?
+allows us to forbid recursive types but also forbids nested enough
+within `Rc`s data types. This is similar to [von Neumann hierarchy
+of sets](https://en.wikipedia.org/wiki/Von_Neumann_universe) as sets
+there have some rank ordinal. Maybe there could be `unsafe auto trait
+Leak<const N: usize> {}` for that?
 
 ### Turning drop invocations into compiler errors
 

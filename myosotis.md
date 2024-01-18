@@ -349,6 +349,13 @@ not essential understanding the overall design of proposed feature.*
 
 ### Ranked Leak trait
 
+### Turning drop invocations into compiler errors
+
+Perhaps we could an have some automatic trait `RoutineDrop` which if
+unimplemented of a type means that dropping this value would result
+in compiler error. This may be useful with hypothetical async drop. It
+could also help expand linear type functionality.
+
 ## Forward compatibility
 
 Since I wrote this text in terms of destructors, it should be play nicely

@@ -1,4 +1,4 @@
-# The drop guarantee
+# The drop guarantee and linear types formulation
 
 <a title="Forget-me-nots - Sedum Tauno Erik, CC BY-SA 2.5 &lt;https://creativecommons.org/licenses/by-sa/2.5&gt;, via Wikimedia Commons" href="https://commons.wikimedia.org/wiki/File:Myosotis_arvensis_ois.JPG"><img width="512" alt="Myosotis arvensis ois" src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Myosotis_arvensis_ois.JPG/512px-Myosotis_arvensis_ois.JPG"></a>
 
@@ -263,7 +263,58 @@ On the other side any safety invariant violation could only be caused by
 unsafe code, so we can retain old behaviour of drop and define the drop
 panic of `!Leak` types to being a valid cleanup, assuming inner fields
 are dropped too after that or abort happened, so **you would have to be
-careful with panics too**.
+careful with panics too**. In this case you can manually abort on panic.
+
+Consider one other example from [leak-playground](https://zetanumbers.github.io/leak-playground/leak_playground/):
+
+<div id="internal_unleak_future">
+
+```rust
+fn _internal_unleak_future() -> impl std::future::Future<Output = ()> + Leak {
+    async {
+        let num = std::hint::black_box(0);
+        let bor = Unleak::new(&num);
+        let () = std::future::pending().await;
+        assert_eq!(*bor.0, 0);
+    }
+}
+```
+
+</div>
+
+During the execution of a future, local variables have non-static
+lifetimes, however after future yields these lifetimes become static
+unless they refer to something outside of it. This is an example of sound
+and safe lifetime extension thus making the whole future `Leak`. However,
+if when we use `JoinGuard` it becomes a little bit trickier:
+
+```rust
+fn _internal_join_guard_future() -> impl std::future::Future<Output = ()> + Leak {
+    async {
+        let local = 42;
+        let thrd = JoinGuard::spawn({
+            let local = &local;
+            move || {
+                let _inner_local = local;
+            }
+        });
+        let () = std::future::pending().await;
+        drop(thrd);
+    }
+}
+```
+
+Code above may lead to UB if we `forget` this future, meaning the memory
+holding this future is deallocated without dropping this future first. But
+remember that self-referencial (`!Unpin`) future after it starts is
+pinned forever, which means it is guaranteed there is/should be no way
+to forget and deallocate underlying value in safe code (see pin's [drop
+guarantee](https://doc.rust-lang.org/std/pin/index.html#drop-guarantee)).
+However outside of rust-lang project some people would not follow this
+rule because they don't know about it or maybe discard it puposefuly
+(the *Rust police* is coming for you). Maybe in the future it would be
+possible to somehow relax this rule in some cases, but it would be a
+different problem.
 
 ## Extensions and alternatives
 
@@ -292,8 +343,11 @@ not sure if anyone relies upon this, so we could use abort instead. Or
 instead we can add `std::mem::is_leak::<T>() -> bool` to determine if
 we can forget values or not and then act accordingly.
 
-There could also be some niche compilation case, where compiler assumes
-every type is `Leak` and purposefully forgets a value.
+Currently [internally unleak futures](#internal_unleak_future)
+examples emit errors where shouldn't or should emit different errors,
+so I guess some compiler hacking is required. There could also be some
+niche compilation case, where compiler assumes every type is `Leak`
+and purposefully forgets a value.
 
 <!--
 

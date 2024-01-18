@@ -90,7 +90,7 @@ Notice what this implies for `T: 'static` types. Since static lifetime
 never ends or ends only after end of program's execution, the drop
 may never be called. This property does not conflict with described
 use cases. `JoinGuard<'static, T>` indeed doesn't require to ever
-be destroyed, since there would be no references what would ever be
+be destroyed, since there would be no references that would ever be
 invalidated.
 
 In the context of discussion around `Leak` trait some argue it is possible
@@ -107,7 +107,7 @@ which role would be to conservatively establish order of events if
 those ever exist. Alternatively you will be fundamentally limited by the
 [halting problem](https://en.wikipedia.org/wiki/Halting_problem).
 
-On the topic of abort, it shouldn't be considered an end to any lifetime,
+On the topic of abort or exit, it shouldn't be considered an end to any lifetime,
 since otherwise abort and even spontaneous termination of a program like
 SIGTERM becomes unsafe.
 
@@ -127,7 +127,9 @@ satisfy these requirements**, leaving us with just **the value has to not
 own itself**. Also reminding you that `'static` values can be moved into
 static context like static variables, which lifetime exceeds lifetime
 of a program's execution itself, so consider that analogous to calling
-`std::process::abort()` before `'static` ends.
+`std::process::exit()` before `'static` ends.
+
+<!-- exit is a better example, because it doesn't imply any kind of erroneous termination, unlike abort  -->
 
 ## Trivial implementation
 
@@ -159,15 +161,15 @@ functionality:
  (constructors) fallback in case ownership cycles are guaranteed to be
  broken before cleanup;
  - Channel types like inside of `std::sync::mpsc` with a shared buffer of
- `T` is problematic since through sender type you can send corresponding
- to it receiver, thus leaking that shared buffer;
-  * Rendezvous channels seem to lack this flaw because it waits for
+ `T` are problematic since through sender type you can send corresponding
+ <missing word?> to its receiver, thus leaking that shared buffer;
+  * Rendezvous channels seem to lack this flaw because they wait for
   other thread/task to be ready to take the value instead of running
   off right after sending it;
 
 In any case the library itself dictates appropriate bounds for its types.
 
-Given that `!Leak` implies new restrictions compared to current rust
+Given that `!Leak` implies new restrictions compared to current Rust
 value semantics, by default every type is assumed to be `T: Leak`, kinda
 like with `Sized`, e.g. implicit `Leak` trait bound on every type and
 type argument unless specified otherwise (`T: ?Leak`). I pretty sure this
@@ -195,6 +197,7 @@ impl<T> Unleak<T> {
     }
 }
 
+// This is the primary point of using `Unleak` instead of implementing `!Leak` manually.
 unsafe impl<T: 'static> Leak for Unleak<T> {}
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -203,7 +206,7 @@ struct PhantomUnleak;
 impl !Leak for PhantomUnleak {}
 ```
 
-Will `PhantomUnleak` ever be public/stable is to be determined.
+Whether `PhantomUnleak` will ever be public/stable is to be determined.
 
 One thing that we should be aware of in the future would be users'
 desire of making their types `!Leak` while not actually needing it. The
@@ -216,7 +219,7 @@ do this, they should be informed that **forgetting or leaking a value
 is already undesirable and can be considered a logic bug**.
 
 Of course there should be an unsafe `core::mem::forget_unchecked` for
-any value if you really know what you're doing, there are some ways
+any value if you really know what you're doing, because there are some ways
 to implement `core::mem::forget` for any type with unsafe code still,
 for example with `core::ptr::write`. There should also probably be safe
 `core::mem::forget_static` since you can basically do that using thread
@@ -236,7 +239,7 @@ struct JoinGuard<'a, T: 'a> {
 One interesting case comes up when thinking about types
 [contravariant](https://doc.rust-lang.org/reference/subtyping.html) by
 their generic lifetime argument. Since this lifetime can be extended into
-`'static` you should implement `Leak` then for any possible lifetime in
+`'static` you should then implement `Leak` for any possible lifetime in
 this position.
 
 ```rust
@@ -271,24 +274,29 @@ if we bound it by a different lifetime which is shorter than input
 closure's lifetime. See prototyped `JoinGuardScoped` in leak-playground
 [docs](https://zetanumbers.github.io/leak-playground/leak_playground/)
 and [repo](https://github.com/zetanumbers/leak-playground). There's no
-proposed `Leak` trait, so conditions are enforced manually. It works
-and does not when needed, but I'm not sure without an actual proof.
+proposed `Leak` trait, so conditions are enforced manually. It (what?) works
+or does not work (?) when needed, but I'm not sure without an actual proof.
 
-One other decision to be made about handling a panic during a drop of a
+One other decision to be made is about handling a panic during a drop of a
 `!Leak` value. Panic in this case could indicate a failure of a drop
 implementation, thus state of borrowed values might remain invalid
 according to the type invariant. It should be safe to make some type
 `!Leak` with dummy types, so we cannot put a requirement prohibiting
 panic within drop for `!Leak` types. This leaves us with abort on a
 drop panic, which would propagate to any type containing `!Leak` value
-too. Still, interactions with generic `T: ?Leak` types remain unclear
-as to dynamically differentiate between `Leak` and `!Leak` types or not.
+too. Still, due to interactions with generic `T: ?Leak` types it remains unclear
+whether to dynamically differentiate between `Leak` and `!Leak` types or not.
+<!-- I'm not sure what did you mean exactly due to grammar -->
 On the other side any safety invariant violation could only be caused by
 unsafe code, so we can retain old behavior of drop and define the drop
 panic of `!Leak` types to being a valid cleanup, assuming inner fields
 are dropped too after that or abort happened, so **you would have to
 be careful with panics too**. In this case you can manually abort on
 panic. This also relates to any other destructor too.
+
+#### Sub-section N
+<!-- It would make sense to introduce some sub-sections into this large section to visually
+separate parts talking about different things -->
 
 Consider one other example from
 [leak-playground](https://zetanumbers.github.io/leak-playground/leak_playground/):
@@ -331,12 +339,14 @@ fn _internal_join_guard_future() -> impl std::future::Future<Output = ()> + Leak
 ```
 
 Code above may lead to UB if we `forget` this future, meaning
-the memory holding this future is deallocated without dropping
-this future first because spawned thread may refer to future's
-local state if not joined. But remember that self-referential
-(`!Unpin`) future after it starts is pinned forever, which
-means it is guaranteed there is/should be no way to forget
-and deallocate underlying value in safe code (see pin's [drop
+that memory holding this future is deallocated without dropping
+this future first, because spawned thread may refer to the future's
+local state if not joined.
+<!-- The previous sentence was very hard to read -->
+But remember that self-referential
+(`!Unpin`) future is pinned forever after it starts, which
+means that it is guaranteed there is no way (or at least should be no way) to forget
+and deallocate the underlying value in safe code (see pin's [drop
 guarantee](https://doc.rust-lang.org/std/pin/index.html#drop-guarantee)).
 However outside of rust-lang project some people would not follow this
 rule because they don't know about it or maybe discard it purposefully
@@ -353,7 +363,7 @@ feature.*
 ### Disowns (and NeverGives) trait(s)
 
 If you think about `Rc` long enough, the `T: Leak` bound will start to
-feel unnecessary strong. Maybe we could add a trait that signify that you
+feel unnecessary strong. Maybe we could add a trait that signify that your
 type can never own `Rc` of self, which would allow us to have a new bound:
 
 ```rust
@@ -375,7 +385,7 @@ pub fn scoped<F>(f: F) -> JoinGuard<F>
 where
     F: NeverGives<JoinGuard<F>>
 {
-    // ...    
+    // ...
 }
 ```
 
@@ -426,7 +436,7 @@ Leak<const N: usize> {}` for that?
 ### Turning drop invocations into compiler errors
 
 Perhaps we could an have some automatic trait `RoutineDrop` which if
-unimplemented of a type means that dropping this value would result
+unimplemented for a type means that dropping this value would result
 in compiler error. This may be useful with hypothetical async drop. It
 could also help expand linear type functionality.
 
@@ -445,7 +455,7 @@ instead we can add `std::mem::is_leak::<T>() -> bool` to determine if
 we can forget values or not and then act accordingly.
 
 Currently [internally unleak futures](#internal_unleak_future)
-examples emit errors where shouldn't or should emit different errors,
+examples emit errors where they shouldn't or should emit different errors,
 so I guess some compiler hacking is required. There could also be some
 niche compilation case, where compiler assumes every type is `Leak`
 and purposefully forgets a value.

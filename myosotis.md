@@ -203,7 +203,55 @@ struct PhantomUnleak;
 impl !Leak for PhantomUnleak {}
 ```
 
-Will `PhantomUnleak` ever be public/stable is to be determined.
+This wrapper makes it easy to define `!Leak` data structures. It
+implements `Leak` for `'static` case for you. As a rule of thumb
+you determine which field (it should contain struct's lifetime or
+generic type argument) would require the destruction guarantee, so
+if you invalidate safety invariant of a borrowed type, make sure
+this borrow is under `Unleak`.  To illustrate how `Unleak` helps
+you could look at this example:
+
+```rust
+struct Variance<Contra, Co> {
+    process: fn(Contra) -> String,
+    // invalidate `Co` type's safety invariant before restoring it
+    // inside of the drop
+    queue: Unleak<Co>,
+}
+```
+
+If you aware of
+[variance](https://doc.rust-lang.org/reference/subtyping.html) then
+you should know that contravariant lifetimes (which are placed
+inside of arguments of a function pointer) can be extended via
+subtyping up to the `'static` lifetime, it is also applied to
+lifetime bounds of generic type arguments. So it should be useless
+to mark this function pointer with `Unleak`. If we just had
+`PhantomUnleak` there - this is what example above would look like
+instead:
+
+```rust
+struct Variance<Contra, Co> {
+    process: fn(Contra) -> String,
+    queue: Co,
+    _unleak: PhantomUnleak,
+}
+
+unsafe impl<Contra, Co: 'static> Leak for Variance<Contra, Co> {}
+```
+
+It now requires unsafe impl with a bit unclear type bounds. If user
+forgets to add the `Leak` implementation the type would become
+restricted as any `!Leak` type even if type itself `'static`,
+granting nothing of value. If user messes up and doesn't add
+appropriate `'static` bounds, It may lead to unsound API. So the
+`PhantomUnleak` should probably be private/unstable.
+
+Now given this a bit awkward situation about `'static => Leak`,
+impl and dyn trait types can sometimes be meaningless like `Box<dyn
+Debug + ?Leak>` or `-> impl Debug + ?Leak` because those are static
+unless you add `+ 'a` explicit lifetime bound, so there probably
+should be a lint that would warn user about that.
 
 One thing that we should be aware of in the future would be users'
 desire of making their types `!Leak` while not actually needing it. The
@@ -221,7 +269,7 @@ to implement `core::mem::forget` for any type with unsafe code still,
 for example with `core::ptr::write`. There should also probably be safe
 `core::mem::forget_static` since you can basically do that using thread
 with an endless loop. However `?Leak` types implement `Leak` for static
-lifetimes transitively from `PhantomUnleak` to satisfy any function's
+lifetimes transitively from `Unleak` to satisfy any function's
 bounds over types.
 
 ```rust
@@ -229,21 +277,7 @@ bounds over types.
 struct JoinGuard<'a, T: 'a> {
     // ...
     _marker: PhantomData<fn() -> T>,
-    _unleak: Unleak<PhantomData<&'a ()>>,
-}
-```
-
-One interesting case comes up when thinking about types
-[contravariant](https://doc.rust-lang.org/reference/subtyping.html) by
-their generic lifetime argument. Since this lifetime can be extended into
-`'static` you should implement `Leak` then for any possible lifetime in
-this position.
-
-```rust
-struct ContravariantLifetime<'contravariant, 'covariant> {
-    // ...
-    _variance: PhantomData<fn(&'contravariant ())>,
-    _unleak: Unleak<PhantomData<&'covariant ()>>,
+    _unleak: PhantomData<Unleak<&'a ()>>,
 }
 ```
 
@@ -258,7 +292,7 @@ having live references to parent thread local variables.
 struct JoinGuard<'a, T: 'a> {
     // ...
     _marker: PhantomData<fn() -> T>,
-    _unleak: Unleak<PhantomData<&'a ()>>,
+    _unleak: PhantomData<Unleak<&'a ()>>,
     _unsend: PhantomData<*mut ()>,
 }
 

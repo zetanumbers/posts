@@ -655,4 +655,4 @@ me.](https://en.wikipedia.org/wiki/Undefined_behavior)
 
 ## Credits
 
-Thanks to @petrochenkov for discussing this proposal with me.
+Thanks to @petrochenkov for reviewing and discussing this proposal with me.

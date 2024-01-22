@@ -310,7 +310,8 @@ closure's lifetime. See prototyped `JoinGuardScoped` in leak-playground
 [docs](https://zetanumbers.github.io/leak-playground/leak_playground/)
 and [repo](https://github.com/zetanumbers/leak-playground). There's no
 proposed `Leak` trait, so conditions are enforced manually. The doctest
-code behaves as intended , but I have no proof it is 100% valid.
+code behaves as intended (except for internally unleak future examples),
+but I have no proof it is 100% valid.
 
 One other consequence would be that if a drop of a `!Leak` object panics
 it should be safe to use the *referred to* object, basically meaning that

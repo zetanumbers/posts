@@ -1,6 +1,7 @@
 arvensis
 deallocate
 deallocated
+doctest
 exceeds
 impls
 jthread

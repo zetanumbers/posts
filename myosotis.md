@@ -248,7 +248,7 @@ forgets to add the `Leak` implementation the type would become restricted
 as any `!Leak` type even if type itself `'static`, granting nothing of
 value. If user messes up and doesn't add appropriate `'static` bounds,
 It may lead to unsound API. `Unleak` on the other hand automatically
-ensures that `T: 'staic => T: Leak`. So the `PhantomUnleak` should
+ensures that `T: 'static => T: Leak`. So the `PhantomUnleak` should
 probably be private/unstable.
 
 Now given this a bit awkward situation about `T: 'static => T: Leak`,
@@ -313,7 +313,7 @@ proposed `Leak` trait, so conditions are enforced manually. The doctest
 code behaves as intended , but I have no proof it is 100% valid.
 
 One other consequence would be that if a drop of a `!Leak` object panics
-it should be safe to use the *refered to* object, basically meaning that
+it should be safe to use the *referred to* object, basically meaning that
 panic or unwind is a valid exit path from the drop implementation. If
 `!Leak` type invalidates some safe type invariant of a borrowed object,
 then even if the drop implementation panics, it should restore this

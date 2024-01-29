@@ -304,9 +304,9 @@ unsafe impl<'a, T> Send for JoinGuard<'a, T> where Self: Leak {}
 unsafe impl<'a, T> Sync for JoinGuard<'a, T> {}
 ```
 
-There is also a way to forbid `JoinGuard` from moving into its thread
-if we bound it by a different lifetime which is shorter than input
-closure's lifetime. See prototyped `JoinGuardScoped` in leak-playground
+There is also a way to forbid `JoinGuard` from moving into its thread if
+we bound it by a different lifetime which is shorter than input closure's
+lifetime. See prototyped `thread::SendJoinGuard` in leak-playground
 [docs](https://zetanumbers.github.io/leak-playground/leak_playground/)
 and [repo](https://github.com/zetanumbers/leak-playground). There's no
 proposed `Leak` trait, so conditions are enforced manually. The doctest

@@ -307,11 +307,13 @@ unsafe impl<'a, T> Sync for JoinGuard<'a, T> {}
 There is also a way to forbid `JoinGuard` from moving into its thread if
 we bound it by a different lifetime which is shorter than input closure's
 lifetime. See prototyped `thread::SendJoinGuard` in leak-playground
-[docs](https://zetanumbers.github.io/leak-playground/leak_playground/)
-and [repo](https://github.com/zetanumbers/leak-playground). There's no
-proposed `Leak` trait, so conditions are enforced manually. The doctest
-code behaves as intended (except for internally unleak future examples),
-but I have no proof it is 100% valid.
+[docs](https://zetanumbers.github.io/leak-playground/leak_playground_std/)
+and [repo](https://github.com/zetanumbers/leak-playground). There're
+also some new possible features for tokio in
+[leak_playground_tokio](https://zetanumbers.github.io/leak-playground/leak_playground_tokio/)
+like non-static task support. The doctest code behaves as intended
+(except for internally unleak future examples), but I have no formal
+proof of it being 100% valid.
 
 One other consequence would be that if a drop of a `!Leak` object panics
 it should be safe to use the *referred to* object, basically meaning that

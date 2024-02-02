@@ -300,16 +300,20 @@ struct JoinGuard<'a, T: 'a> {
     _unsend: PhantomData<*mut ()>,
 }
 
-unsafe impl<'a, T> Send for JoinGuard<'a, T> where Self: Leak {}
+unsafe impl<'static, T: 'static> Send for JoinGuard<'static, T> where Self: Leak {}
 unsafe impl<'a, T> Sync for JoinGuard<'a, T> {}
 ```
 
-There is also a way to forbid `JoinGuard` from moving into its thread if
-we bound it by a different lifetime which is shorter than input closure's
-lifetime. See prototyped `thread::SendJoinGuard` in leak-playground
+There is also a way to forbid `JoinGuard` from moving into its
+thread if we bound it by a different lifetime which is shorter than
+input closure's lifetime. See prototyped `thread::SendJoinGuard`
+in leak-playground
 [docs](https://zetanumbers.github.io/leak-playground/leak_playground_std/)
-and [repo](https://github.com/zetanumbers/leak-playground). There're
-also some new possible features for tokio in
+and [repo](https://github.com/zetanumbers/leak-playground). Because
+there's no `Leak` trait outside of this repo and external libraries
+cannot account for it, `!Leak` types usage safety is enforced
+manually sometimes. There're also some new possible features for
+tokio in
 [leak_playground_tokio](https://zetanumbers.github.io/leak-playground/leak_playground_tokio/)
 like non-static task support. The doctest code behaves as intended
 (except for internally unleak future examples), but I have no formal

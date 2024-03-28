@@ -1,6 +1,7 @@
 arvensis
 deallocate
 deallocated
+desugared
 doctest
 exceeds
 impls
@@ -15,6 +16,7 @@ subtyping
 Tauno
 thrd
 tigerbeetle
+Uninit
 unleak
 Unleak
 unsend

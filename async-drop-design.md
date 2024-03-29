@@ -42,7 +42,7 @@ impl<T> AsyncDrop for CancellableJoinHandle<T> {
     fn async_drop(self: Pin<&mut Self>) -> Self::Dropper<'_> {
         async move {
             self.join_handle.abort();
-            let _ = self.join_handle.await;
+            let _ = Pin::new(&mut self.join_handle).await;
         }
     }
 }
@@ -120,9 +120,9 @@ async unsafe fn either<O: IntoFuture<Output = ()>, M: IntoFuture<Output = ()>, T
     other: O,
     matched: M,
     this: *mut T,
-    discr: <T as DiscriminantKind>::Discriminant,
+    discriminant: <T as DiscriminantKind>::Discriminant,
 ) {
-    if unsafe { discriminant_value(&*this) } == discr {
+    if unsafe { discriminant_value(&*this) } == discriminant {
         drop(other);
         matched.await
     } else {
@@ -149,6 +149,28 @@ describe below. Automatic async drops at the end of the scope aren't
 implemented too.
 
 ## What's next?
+
+### ADT async destructor types
+
+As I've said those future combinators are just a patchwork for
+current inability to generate ADT futures on the fly. Defining such
+components inside of the `core` is fine in some cases, like for
+async destructor of slice. But for ADTs, tuples, closures the proper
+solution would be to define the new [type kind] named something like
+`AdtAsyncDestructor`. Given one of those types we could generate
+a consistent state for the async destructor and then generate its
+`Future::poll` function. This way we won't need to calculate and store
+all the pointers to each field ahead of time.
+
+## Ideas
+
+### `async_drop_in_place` should work with references?
+
+Since `async_drop_in_place` returns an async destructor future what should
+reference the dropped object, perhaps it would be more beneficial to have
+`async_drop_in_place` use reference `&mut ManuallyDrop<T>` instead. It
+would be less unsafe and we won't have to deal with pointers infecting
+async destructor types with `!Send` and `!Sync`.
 
 ### Async drop glue for `dyn Trait`
 
@@ -210,7 +232,7 @@ WIP
 ## Conclusion
 
 There are still a lot of questions to be answered, but it's important
-to not put out hands down.
+to not put our hands down.
 
 [`drop_in_place`]: https://doc.rust-lang.org/1.77.0/src/core/ptr/mod.rs.html#507-513
 [`DiscriminantKind`]: https://doc.rust-lang.org/1.77.0/src/core/marker.rs.html#881-886
@@ -218,3 +240,4 @@ to not put out hands down.
 [`FnMut`]: https://doc.rust-lang.org/1.77.0/std/ops/trait.FnMut.html
 [`tokio::task::JoinHandle`]: https://docs.rs/tokio/1.36.0/tokio/task/struct.JoinHandle.html
 [`JoinHandle::abort`]: https://docs.rs/tokio/1.36.0/tokio/task/struct.JoinHandle.html#method.abort
+[type kind]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/ty_kind/enum.TyKind.html

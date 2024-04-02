@@ -226,7 +226,7 @@ chain(
             async_drop_in_place_raw((*(to_drop as *mut T::Variant0)).field1),
         ),
         to_drop,
-        variant_0_discr,
+        variant0_discriminant,
     ),
 )
 ```

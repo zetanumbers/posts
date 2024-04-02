@@ -19,6 +19,7 @@ petrochenkov
 precompute
 println
 repr
+rustc
 struct
 subtyping
 thrd

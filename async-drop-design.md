@@ -4,7 +4,7 @@ This text aims to explain the design of [my asynchronous drop
 prototype](https://github.com/rust-lang/rust/pull/121801), which I have
 been working on for some time now.
 
-## Public interface of `AsyncDrop`
+## Public interface of AsyncDrop
 
 I've tried to make interface of asynchronous drops as similar to the
 synchronous drops as possible. Take a look at the definition of the most
@@ -218,7 +218,7 @@ all the pointers to each field ahead of time.
 
 ## Ideas
 
-### `async_drop_in_place` should work with references?
+### Should async_drop_in_place work with references?
 
 Since `async_drop_in_place` returns an async destructor future what should
 reference the dropped object, perhaps it would be more beneficial to have
@@ -226,7 +226,7 @@ reference the dropped object, perhaps it would be more beneficial to have
 would be less unsafe and we won't have to deal with pointers infecting
 async destructor types with `!Send` and `!Sync`.
 
-### Async drop glue for `dyn Trait`
+### Async drop glue for dyn Trait
 
 The problem with dynamic types is basically about
 loosing the type information. We cannot know `<dyn Trait as

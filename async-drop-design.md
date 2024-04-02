@@ -12,6 +12,7 @@ important public trait of my prototype (`AsyncDrop` trait):
 
 ```rust
 /// Custom code within the asynchronous destructor.
+#[lang = "async_drop"]
 pub trait AsyncDrop {
     /// A future returned by the [`AsyncDrop::async_drop`] to be part
     /// of the async destructor.
@@ -67,6 +68,7 @@ pub async fn async_drop<T>(to_drop: T) {
     unsafe { async_drop_in_place(to_drop.as_mut_ptr()).await };
 }
 
+#[lang = "async_drop_in_place"]
 pub unsafe fn async_drop_in_place<T: ?Sized>(
     to_drop: *mut T,
 ) -> <T as AsyncDestruct>::AsyncDestructor {
@@ -82,6 +84,7 @@ AsyncDestruct`. Let's take a closer look of `AsyncDestruct` trait and
 its associated type:
 
 ```rust
+#[lang = "async_destruct"]
 trait AsyncDestruct {
     type AsyncDestructor: Future<Output = ()>;
 }
@@ -240,6 +243,7 @@ type which contains space both for `T` and for `<AsyncDestruct as
 T>::AsyncDestructor`?
 
 ```rust
+#[lang = "PollDestruct"]
 trait PollDestruct {
     fn poll_drop(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()>;
 }

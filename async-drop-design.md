@@ -107,6 +107,9 @@ types. Although some code couldn't have been offloaded to the `core`
 ahead of time inside of the `async_drop` method.
 
 ```rust
+// NOTE: For some reason this implementation currently does not pass
+//   tests, so I've had to keep manually desugared version of it.
+#[lang = "async_drop_chain"]
 async fn chain<F, G>(first: F, second: G)
 where
     F: IntoFuture<Output = ()>,
@@ -116,6 +119,7 @@ where
     second.await;
 }
 
+#[lang = "async_drop_either"]
 async unsafe fn either<O: IntoFuture<Output = ()>, M: IntoFuture<Output = ()>, T>(
     other: O,
     matched: M,
@@ -129,6 +133,11 @@ async unsafe fn either<O: IntoFuture<Output = ()>, M: IntoFuture<Output = ()>, T
         drop(matched);
         other.await
     }
+}
+
+#[lang = "async_drop_defer"]
+async unsafe fn defer<T: ?Sized>(to_drop: *mut T) {
+    unsafe { async_drop_in_place(to_drop) }.await
 }
 ```
 
@@ -147,6 +156,22 @@ their special code for generating even regular drop glue, extracting a
 it. For dynamic types support I have a hypothetical design which I'll
 describe below. Automatic async drops at the end of the scope aren't
 implemented too.
+
+### Combinator table
+
+|Combinator|Description|
+|---|---|
+|either|Used by async destructors for enums to choose which variant of the enum to execute depending on enum's discriminant value|
+|chain|Used by async destructors for ADTs to chain fields' async destructors|
+|fuse|Used by async destructors to return `Poll::Ready(())` on every poll after completion|
+|nop|Used by async destructors for trivially destructible types|
+|never|Used by async destructors for empty types like enums with zero variants|
+|slice|Used by async destructors for slices and arrays|
+|surface_async_drop_in_place|Used by async destructors to execute the surface level `AsyncDrop::Dropper` future of a type|
+|surface_drop_in_place|Used by async destructors to execute the surface level `Drop::drop` of a type|
+
+See current implementations of these combinators inside of the
+[library/core/src/future/async_drop.rs].
 
 ## What's next?
 
@@ -240,4 +265,5 @@ to not put our hands down.
 [`FnMut`]: https://doc.rust-lang.org/1.77.0/std/ops/trait.FnMut.html
 [`tokio::task::JoinHandle`]: https://docs.rs/tokio/1.36.0/tokio/task/struct.JoinHandle.html
 [`JoinHandle::abort`]: https://docs.rs/tokio/1.36.0/tokio/task/struct.JoinHandle.html#method.abort
+[library/core/src/future/async_drop.rs]: https://github.com/zetanumbers/rust/blob/async_drop_glue/library/core/src/future/async_drop.rs
 [type kind]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/ty_kind/enum.TyKind.html

@@ -164,14 +164,14 @@ implemented too.
 
 |Combinator|Description|
 |---|---|
-|either|Used by async destructors for enums to choose which variant of the enum to execute depending on enum's discriminant value|
-|chain|Used by async destructors for ADTs to chain fields' async destructors|
-|fuse|Used by async destructors to return `Poll::Ready(())` on every poll after completion|
-|nop|Used by async destructors for trivially destructible types|
-|never|Used by async destructors for empty types like enums with zero variants|
-|slice|Used by async destructors for slices and arrays|
-|surface_async_drop_in_place|Used by async destructors to execute the surface level `AsyncDrop::Dropper` future of a type|
-|surface_drop_in_place|Used by async destructors to execute the surface level `Drop::drop` of a type|
+|`either`|Used by async destructors for enums to choose which variant of the enum to execute depending on enum's discriminant value|
+|`chain`|Used by async destructors for ADTs to chain fields' async destructors|
+|`fuse`|Used by async destructors to return `Poll::Ready(())` on every poll after completion|
+|`nop`|Used by async destructors for trivially destructible types|
+|`never`|Used by async destructors for empty types like enums with zero variants|
+|`slice`|Used by async destructors for slices and arrays|
+|`surface_async_drop_in_place`|Used by async destructors to execute the surface level `AsyncDrop::Dropper` future of a type|
+|`surface_drop_in_place`|Used by async destructors to execute the surface level `Drop::drop` of a type|
 
 You might ask if we even need `Nop` combinator and can't we not
 instantiate async destructor for trivially destructible types? But no,

@@ -170,8 +170,37 @@ implemented too.
 |surface_async_drop_in_place|Used by async destructors to execute the surface level `AsyncDrop::Dropper` future of a type|
 |surface_drop_in_place|Used by async destructors to execute the surface level `Drop::drop` of a type|
 
+You might ask if we even need `Nop` combinator and can't we not
+instantiate async destructor for trivially destructible types? But no,
+this is not possible, since user may call `async_drop_in_place` on any
+type, which has to return some future type.
+
 See current implementations of these combinators inside of the
 [library/core/src/future/async_drop.rs].
+
+### Visibility problem
+
+If you compare public interface for interacting with value discriminants
+within the `core` library with interface described here, you could notice
+usage of trait's associated type instead of a generic type. Actually
+directly using this associated type may be problematic as it can possibly
+leak its special trait and method implementations. Also I believe
+it would be better to keep `AsyncDestruct` trait private. At last it
+perhaps it would be more convenient to use a generic type instead as with
+[`Discriminant`].
+
+To solve this problem the only way right now would be to define a
+wrapper struct `AsyncDropInPlace<T>` around it and forward its `Future`
+implementation to the actual async destructor of type `T`. We would also
+have a new wrapper function `async_drop_in_place` to return that wrapper
+type and would rename compiler generated function which held this name
+previously into `async_drop_in_place_raw`.
+
+However, this `AsyncDropInPlace` could still leak some details of stored
+inner value, such as any auto trait implementation and a drop check. These
+can be either left as is (current behavior) or be suppressed with
+`PhantomData<*mut ()>` field and with a nop `Drop` implementation on it.
+Not sure which one should be chosen.
 
 ## What's next?
 
@@ -266,4 +295,5 @@ to not put our hands down.
 [`tokio::task::JoinHandle`]: https://docs.rs/tokio/1.36.0/tokio/task/struct.JoinHandle.html
 [`JoinHandle::abort`]: https://docs.rs/tokio/1.36.0/tokio/task/struct.JoinHandle.html#method.abort
 [library/core/src/future/async_drop.rs]: https://github.com/zetanumbers/rust/blob/async_drop_glue/library/core/src/future/async_drop.rs
+[`Discriminant`]: https://doc.rust-lang.org/1.77.1/core/mem/struct.Discriminant.html
 [type kind]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/ty_kind/enum.TyKind.html

@@ -342,6 +342,6 @@ to not put our hands down.
 [`tokio::task::JoinHandle`]: https://docs.rs/tokio/1.36.0/tokio/task/struct.JoinHandle.html
 [`JoinHandle::abort`]: https://docs.rs/tokio/1.36.0/tokio/task/struct.JoinHandle.html#method.abort
 [library/core/src/future/async_drop.rs]: https://github.com/zetanumbers/rust/blob/async_drop_glue/library/core/src/future/async_drop.rs
-[`Discriminant`]: https://doc.rust-lang.org/1.77.1/core/mem/struct.Discriminant.html
+[`Discriminant`]: https://doc.rust-lang.org/1.77.0/core/mem/struct.Discriminant.html
 [compiler/rustc_mir_transform/src/shim.rs]: https://github.com/zetanumbers/rust/blob/async_drop_glue/compiler/rustc_mir_transform/src/shim.rs
-[type kind]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/ty_kind/enum.TyKind.html
+[type kind]: https://doc.rust-lang.org/1.77.0/nightly-rustc/rustc_middle/ty/ty_kind/enum.TyKind.html

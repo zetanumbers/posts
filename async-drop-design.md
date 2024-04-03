@@ -262,7 +262,7 @@ a consistent state for the async destructor and then generate its
 `Future::poll` function. This way we won't need to calculate and store
 all the pointers to each field ahead of time.
 
-## Ideas
+## Ideas for the future
 
 ### Should async_drop_in_place work with references?
 
@@ -316,24 +316,63 @@ And like that we embedded enough space and type information to
 unsize these types and work with them, while still being able to be
 asynchronously destroyed.
 
-### Implicit cancellation points
+### Exclusively async drop
 
-WIP
+It's almost pointless to implement `AsyncDrop` on your type while
+it is perfectly valid to synchronously drop your type. There can be
+a way to restrict sync drops of a type by implementing [`!Destruct`]
+for a type. Compiler should emit a compiler error wherever it tries to
+synchronously drop a `?Destruct` value. It would be fine to asynchronously
+drop them, which would be done (semi)automatically inside of async code.
 
-```rust
-{
-    let x = AsyncStruct::new();
-} await
-```
+While this approach as far as I know preserves backwards compatibility,
+it would require users to manually add support for `T: ?Destruct`
+types inside of their code, which is the reason new `?Trait` bounds are
+considered to be unergonomic by many rustc lead developers. Perhaps it
+would be fine to have `T: Destruct` by default for synchronous functions
+and `T: ?Destruct` by default for asynchronous ones in the next edition?
 
-## Unanswered questions
+But my mentor suggests to try out a different approach: emitting such
+errors after monomorphization of a generic function, perhaps as a
+temporary measure before a proper type-level solution is enabled. It
+does sound like how C++ templates work which come with some issues on
+their own. But rust already allows post-monomorphization errors like
+linker errors.
+
+### Automatic async drop and implicit cancellation points
+
+The core feature of the hypothetical async drop mechanism is considered to
+be automatic async cleanup, which requires to add implicit await points
+inside of the async code wherever it destroys an object with async drop
+implementation. Currently every await point also creates a cancellation
+point where future can be cancelled with `drop` if it is suspended there.
+
+Implicit cancellation point within the async code would probably make it
+much more difficult to maintain [cancellation safety] of your async code
+because of not seeing where exactly your async code can suspend. The
+simplest solution for this would be to have implicit await point to
+**not** generate a cancellation point. This is possible if such async
+block implements `!Destruct` (see above) and can only be asynchronously
+dropped. Then if user starts async drop of that future while it is
+suspended on implicit await point, the future will continue as usual
+until it either returns or suspends on explicit await point. User will
+have to explicitly call and await `async_drop` to allow cancellation
+during suspension.
 
 ### Drop of async destructors
+
+How should drop of an async destructor should function? I see the
+simplest solution would probably be that async drop of async destructor
+will simply continue execution of async destructor.
 
 ## Conclusion
 
 There are still a lot of questions to be answered, but it's important
 to not put our hands down.
+
+Also I would like to mention this text is based on similar works of
+many other people, references to which you can find in this [MCP: Low
+level components for async drop].
 
 [`drop_in_place`]: https://doc.rust-lang.org/1.77.0/src/core/ptr/mod.rs.html#507-513
 [`DiscriminantKind`]: https://doc.rust-lang.org/1.77.0/src/core/marker.rs.html#881-886
@@ -345,3 +384,6 @@ to not put our hands down.
 [`Discriminant`]: https://doc.rust-lang.org/1.77.0/core/mem/struct.Discriminant.html
 [compiler/rustc_mir_transform/src/shim.rs]: https://github.com/zetanumbers/rust/blob/async_drop_glue/compiler/rustc_mir_transform/src/shim.rs
 [type kind]: https://doc.rust-lang.org/1.77.0/nightly-rustc/rustc_middle/ty/ty_kind/enum.TyKind.html
+[`!Destruct`]: https://doc.rust-lang.org/1.77.0/core/marker/trait.Destruct.html
+[cancellation safety]: https://docs.rs/tokio/1.36.0/tokio/macro.select.html#cancellation-safety
+[MCP: Low level components for async drop]: https://github.com/rust-lang/compiler-team/issues/727

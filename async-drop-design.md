@@ -167,13 +167,13 @@ implemented too.
 |`either`|Used by async destructors for enums to choose which variant of the enum to execute depending on enum's discriminant value|
 |`chain`|Used by async destructors for ADTs to chain fields' async destructors|
 |`fuse`|Used by async destructors to return `Poll::Ready(())` on every poll after completion|
-|`nop`|Used by async destructors for trivially destructible types|
+|`noop`|Used by async destructors for trivially destructible types|
 |`never`|Used by async destructors for empty types like enums with zero variants|
 |`slice`|Used by async destructors for slices and arrays|
 |`surface_async_drop_in_place`|Used by async destructors to execute the surface level `AsyncDrop::Dropper` future of a type|
 |`surface_drop_in_place`|Used by async destructors to execute the surface level `Drop::drop` of a type|
 
-You might ask if we even need `Nop` combinator and can't we not
+You might ask if we even need `Noop` combinator and can't we not
 instantiate async destructor for trivially destructible types? But no,
 this is not possible, since user may call `async_drop_in_place` on any
 type, which has to return some future type.
@@ -202,7 +202,7 @@ previously into `async_drop_in_place_raw`.
 However, this `AsyncDropInPlace` could still leak some details of stored
 inner value, such as any auto trait implementation and a drop check. These
 can be either left as is (current behavior) or be suppressed with
-`PhantomData<*mut ()>` field and with a nop `Drop` implementation on it.
+`PhantomData<*mut ()>` field and with a noop `Drop` implementation on it.
 Not sure which one should be chosen.
 
 ### Generation of async_drop_in_place_raw

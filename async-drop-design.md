@@ -110,8 +110,6 @@ types. Although some code couldn't have been offloaded to the `core`
 ahead of time inside of the `async_drop` method.
 
 ```rust
-// NOTE: For some reason this implementation currently does not pass
-//   tests, so I've had to keep manually desugared version of it.
 #[lang = "async_drop_chain"]
 async fn chain<F, G>(first: F, second: G)
 where

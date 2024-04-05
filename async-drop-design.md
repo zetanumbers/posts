@@ -165,8 +165,7 @@ implemented too.
 |`either`|Used by async destructors for enums to choose which variant of the enum to execute depending on enum's discriminant value|
 |`chain`|Used by async destructors for ADTs to chain fields' async destructors|
 |`fuse`|Used by async destructors to return `Poll::Ready(())` on every poll after completion|
-|`noop`|Used by async destructors for trivially destructible types|
-|`never`|Used by async destructors for empty types like enums with zero variants|
+|`noop`|Used by async destructors for trivially destructible types and [empty types]|
 |`slice`|Used by async destructors for slices and arrays|
 |`surface_async_drop_in_place`|Used by async destructors to execute the surface level `AsyncDrop::Dropper` future of a type|
 |`surface_drop_in_place`|Used by async destructors to execute the surface level `Drop::drop` of a type|
@@ -378,6 +377,7 @@ level components for async drop].
 [`FnMut`]: https://doc.rust-lang.org/1.77.0/std/ops/trait.FnMut.html
 [`tokio::task::JoinHandle`]: https://docs.rs/tokio/1.36.0/tokio/task/struct.JoinHandle.html
 [`JoinHandle::abort`]: https://docs.rs/tokio/1.36.0/tokio/task/struct.JoinHandle.html#method.abort
+[empty types]: https://doc.rust-lang.org/nomicon/exotic-sizes.html#empty-types
 [library/core/src/future/async_drop.rs]: https://github.com/zetanumbers/rust/blob/async_drop_glue/library/core/src/future/async_drop.rs
 [`Discriminant`]: https://doc.rust-lang.org/1.77.0/core/mem/struct.Discriminant.html
 [compiler/rustc_mir_transform/src/shim.rs]: https://github.com/zetanumbers/rust/blob/async_drop_glue/compiler/rustc_mir_transform/src/shim.rs

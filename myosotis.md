@@ -1,3 +1,8 @@
+> [!WARNING]
+> This post have been moved to my mdBook. This version is no longer maintained.
+> 
+> See maintained version at <https://zetanumbers.github.io/book/myosotis.html>
+
 # The destruction guarantee and linear types formulation
 
 <a title="Forget-me-nots - Sedum Tauno Erik, CC BY-SA 2.5 &lt;https://creativecommons.org/licenses/by-sa/2.5&gt;, via Wikimedia Commons" href="https://commons.wikimedia.org/wiki/File:Myosotis_arvensis_ois.JPG"><img width="512" alt="Myosotis arvensis ois" src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Myosotis_arvensis_ois.JPG/512px-Myosotis_arvensis_ois.JPG"></a>

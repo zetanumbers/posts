@@ -1,3 +1,8 @@
+> [!WARNING]
+> This post have been moved to my mdBook. This version is no longer maintained.
+> 
+> See maintained version at <https://zetanumbers.github.io/book/async-drop-design.html>
+
 # The asynchronous drop glue generation design
 
 This text aims to explain the design of [my asynchronous drop
